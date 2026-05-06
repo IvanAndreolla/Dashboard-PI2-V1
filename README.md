@@ -1,2 +1,3 @@
-# Dashboard-PI2-V1
-Desenvolvimento de uma dashboard para uma boia de monitoramento ambiental
+# PI2---Dashboard-Boia-V1
+
+[Edit in StackBlitz next generation editor ⚡️](https://stackblitz.com/~/github.com/IvanAndreolla/PI2---Dashboard-Boia-V1)
