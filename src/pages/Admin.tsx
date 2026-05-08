@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { CSVUpload } from "../components/CSVUpload";
+import { ImageSelector } from "../components/ImageSelector";
 import {
   BoiaConfig,
   EnvironmentalData,
@@ -227,11 +228,7 @@ export function Admin({
     };
 
     if (editandoId) {
-      setBoias(
-        boias.map((boia) =>
-          boia.id === editandoId ? boiaFinal : boia
-        )
-      );
+      setBoias(boias.map((boia) => (boia.id === editandoId ? boiaFinal : boia)));
     } else {
       const jaExiste = boias.some((boia) => boia.id === idFinal);
 
@@ -270,9 +267,7 @@ export function Admin({
   const alternarBoia = (id: string) => {
     setBoias(
       boias.map((boia) =>
-        boia.id === id
-          ? { ...boia, habilitada: !boia.habilitada }
-          : boia
+        boia.id === id ? { ...boia, habilitada: !boia.habilitada } : boia
       )
     );
   };
@@ -298,7 +293,7 @@ export function Admin({
         <div>
           <h1 className="text-2xl font-bold">Administração</h1>
           <p className="text-gray-500">
-            Cadastro de boias, sensores, comunicação, localização e envio de dados.
+            Cadastro de boias, sensores, comunicação, localização, imagens e envio de dados.
           </p>
         </div>
 
@@ -319,111 +314,160 @@ export function Admin({
         </div>
       </div>
 
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 space-y-4">
+        <h2 className="font-bold text-lg text-blue-900">
+          Guia de integração e cadastro
+        </h2>
+
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 text-sm text-blue-950">
+          <div className="bg-white rounded-lg p-4">
+            <h3 className="font-bold mb-2">1. Como cadastrar uma boia</h3>
+            <p>
+              Informe nome, instituição, responsável, local, latitude, longitude,
+              imagem e os sensores instalados. Se a boia não tiver GPS integrado,
+              mantenha a posição fixa configurada manualmente.
+            </p>
+          </div>
+
+          <div className="bg-white rounded-lg p-4">
+            <h3 className="font-bold mb-2">2. Sensores</h3>
+            <p>
+              Habilite apenas os sensores realmente existentes na boia. Os gráficos,
+              alertas, histórico e visão pública usarão somente os sensores ativos.
+            </p>
+          </div>
+
+          <div className="bg-white rounded-lg p-4">
+            <h3 className="font-bold mb-2">3. Formato CSV esperado</h3>
+            <pre className="bg-gray-900 text-green-300 p-3 rounded-lg overflow-auto text-xs mt-2">
+{`timestamp;tempAr;umidAr;pressao;indiceUV;chuvaAcum;ventoVel;ventoDir;tempAgua;phAgua;condutivEC;turbidez
+2026-05-01 10:00;25.3;70;1012;5;0;12;180;22.1;7.2;980;12`}
+            </pre>
+          </div>
+
+          <div className="bg-white rounded-lg p-4">
+            <h3 className="font-bold mb-2">4. Mensagem MQTT sugerida</h3>
+            <pre className="bg-gray-900 text-green-300 p-3 rounded-lg overflow-auto text-xs mt-2">
+{`Tópico:
+hydra/boias/ifsc-baia-sul/dados
+
+Payload JSON:
+{
+  "timestamp": "2026-05-01 10:00",
+  "tempAr": 25.3,
+  "umidAr": 70,
+  "pressao": 1012,
+  "indiceUV": 5,
+  "chuvaAcum": 0,
+  "ventoVel": 12,
+  "ventoDir": 180,
+  "tempAgua": 22.1,
+  "phAgua": 7.2,
+  "condutivEC": 980,
+  "turbidez": 12
+}`}
+            </pre>
+          </div>
+        </div>
+
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm text-yellow-900">
+          <strong>Observação:</strong> se um sensor não existir em determinada boia,
+          ele pode ficar desabilitado no cadastro. O CSV pode conter colunas extras,
+          mas o sistema só exibirá os sensores ativos daquela boia.
+        </div>
+      </div>
+
       <div className="bg-white rounded-xl shadow-md p-6 space-y-6">
         <div>
           <h2 className="font-bold text-lg">
             {editandoId ? "Editar boia" : "Cadastrar nova boia"}
           </h2>
           <p className="text-sm text-gray-500">
-            Configure nome, instituição, posição, comunicação e sensores.
+            Configure nome, instituição, posição, comunicação, imagem e sensores.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">Nome</label>
-            <input
-              value={form.nome}
-              onChange={(e) => atualizarCampo("nome", e.target.value)}
-              className="w-full border rounded-lg px-3 py-2"
-              placeholder="Boia IFSC Baía Sul"
-            />
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <div className="xl:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm text-gray-600 mb-1">Nome</label>
+              <input
+                value={form.nome}
+                onChange={(e) => atualizarCampo("nome", e.target.value)}
+                className="w-full border rounded-lg px-3 py-2"
+                placeholder="Boia IFSC Baía Sul"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm text-gray-600 mb-1">Instituição</label>
+              <input
+                value={form.instituicao}
+                onChange={(e) => atualizarCampo("instituicao", e.target.value)}
+                className="w-full border rounded-lg px-3 py-2"
+                placeholder="IFSC, UFSC..."
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm text-gray-600 mb-1">Responsável</label>
+              <input
+                value={form.responsavel || ""}
+                onChange={(e) => atualizarCampo("responsavel", e.target.value)}
+                className="w-full border rounded-lg px-3 py-2"
+                placeholder="Equipe, laboratório..."
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm text-gray-600 mb-1">Local</label>
+              <input
+                value={form.local}
+                onChange={(e) => atualizarCampo("local", e.target.value)}
+                className="w-full border rounded-lg px-3 py-2"
+                placeholder="Baía Sul, Lagoa do Peri..."
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm text-gray-600 mb-1">Latitude</label>
+              <input
+                type="number"
+                step="any"
+                value={form.latitude}
+                onChange={(e) => atualizarCampo("latitude", Number(e.target.value))}
+                className="w-full border rounded-lg px-3 py-2"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm text-gray-600 mb-1">Longitude</label>
+              <input
+                type="number"
+                step="any"
+                value={form.longitude}
+                onChange={(e) => atualizarCampo("longitude", Number(e.target.value))}
+                className="w-full border rounded-lg px-3 py-2"
+              />
+            </div>
+
+            <div className="md:col-span-3">
+              <label className="block text-sm text-gray-600 mb-1">Descrição</label>
+              <textarea
+                value={form.descricao}
+                onChange={(e) => atualizarCampo("descricao", e.target.value)}
+                className="w-full border rounded-lg px-3 py-2"
+                rows={4}
+                placeholder="Descrição da boia, finalidade e contexto de uso..."
+              />
+            </div>
           </div>
 
           <div>
-            <label className="block text-sm text-gray-600 mb-1">
-              Instituição
-            </label>
-            <input
-              value={form.instituicao}
-              onChange={(e) => atualizarCampo("instituicao", e.target.value)}
-              className="w-full border rounded-lg px-3 py-2"
-              placeholder="IFSC, UFSC..."
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">
-              Responsável
-            </label>
-            <input
-              value={form.responsavel || ""}
-              onChange={(e) => atualizarCampo("responsavel", e.target.value)}
-              className="w-full border rounded-lg px-3 py-2"
-              placeholder="Equipe, laboratório, pesquisador..."
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">Local</label>
-            <input
-              value={form.local}
-              onChange={(e) => atualizarCampo("local", e.target.value)}
-              className="w-full border rounded-lg px-3 py-2"
-              placeholder="Baía Sul, Lagoa do Peri..."
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">Latitude</label>
-            <input
-              type="number"
-              step="any"
-              value={form.latitude}
-              onChange={(e) =>
-                atualizarCampo("latitude", Number(e.target.value))
-              }
-              className="w-full border rounded-lg px-3 py-2"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">
-              Longitude
-            </label>
-            <input
-              type="number"
-              step="any"
-              value={form.longitude}
-              onChange={(e) =>
-                atualizarCampo("longitude", Number(e.target.value))
-              }
-              className="w-full border rounded-lg px-3 py-2"
-            />
-          </div>
-
-          <div className="md:col-span-3">
-            <label className="block text-sm text-gray-600 mb-1">
-              Caminho da imagem
-            </label>
-            <input
+            <label className="block text-sm text-gray-600 mb-2">Imagem da boia</label>
+            <ImageSelector
               value={form.imagem}
-              onChange={(e) => atualizarCampo("imagem", e.target.value)}
-              className="w-full border rounded-lg px-3 py-2"
-              placeholder="/assets/boias/medusa.png"
-            />
-          </div>
-
-          <div className="md:col-span-3">
-            <label className="block text-sm text-gray-600 mb-1">
-              Descrição
-            </label>
-            <textarea
-              value={form.descricao}
-              onChange={(e) => atualizarCampo("descricao", e.target.value)}
-              className="w-full border rounded-lg px-3 py-2"
-              rows={3}
-              placeholder="Descrição da boia, finalidade e contexto de uso..."
+              onChange={(novaImagem) => atualizarCampo("imagem", novaImagem)}
             />
           </div>
         </div>
@@ -436,9 +480,7 @@ export function Admin({
               <input
                 type="checkbox"
                 checked={form.comunicacao.mqtt}
-                onChange={(e) =>
-                  atualizarComunicacao("mqtt", e.target.checked)
-                }
+                onChange={(e) => atualizarComunicacao("mqtt", e.target.checked)}
               />
               MQTT
             </label>
@@ -447,9 +489,7 @@ export function Admin({
               <input
                 type="checkbox"
                 checked={form.comunicacao.lora || false}
-                onChange={(e) =>
-                  atualizarComunicacao("lora", e.target.checked)
-                }
+                onChange={(e) => atualizarComunicacao("lora", e.target.checked)}
               />
               LoRa
             </label>
@@ -458,9 +498,7 @@ export function Admin({
               <input
                 type="checkbox"
                 checked={form.comunicacao.can || false}
-                onChange={(e) =>
-                  atualizarComunicacao("can", e.target.checked)
-                }
+                onChange={(e) => atualizarComunicacao("can", e.target.checked)}
               />
               CAN
             </label>
@@ -469,9 +507,7 @@ export function Admin({
               <input
                 type="checkbox"
                 checked={form.comunicacao.serial || false}
-                onChange={(e) =>
-                  atualizarComunicacao("serial", e.target.checked)
-                }
+                onChange={(e) => atualizarComunicacao("serial", e.target.checked)}
               />
               Serial
             </label>
@@ -480,23 +516,17 @@ export function Admin({
               <input
                 type="checkbox"
                 checked={form.gpsIntegrado}
-                onChange={(e) =>
-                  atualizarCampo("gpsIntegrado", e.target.checked)
-                }
+                onChange={(e) => atualizarCampo("gpsIntegrado", e.target.checked)}
               />
               GPS integrado
             </label>
           </div>
 
           <div>
-            <label className="block text-sm text-gray-600 mb-1">
-              Tópico MQTT
-            </label>
+            <label className="block text-sm text-gray-600 mb-1">Tópico MQTT</label>
             <input
               value={form.comunicacao.mqttTopico || ""}
-              onChange={(e) =>
-                atualizarComunicacao("mqttTopico", e.target.value)
-              }
+              onChange={(e) => atualizarComunicacao("mqttTopico", e.target.value)}
               className="w-full border rounded-lg px-3 py-2"
               placeholder="hydra/boias/boia-ifsc/dados"
             />
@@ -538,9 +568,7 @@ export function Admin({
                     </div>
 
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">
-                        Unidade
-                      </label>
+                      <label className="block text-xs text-gray-500 mb-1">Unidade</label>
                       <input
                         value={sensorAtual?.unidade || ""}
                         onChange={(e) =>
@@ -658,10 +686,7 @@ export function Admin({
             const ultima = dadosBoia[dadosBoia.length - 1];
 
             return (
-              <div
-                key={boia.id}
-                className="border rounded-xl p-4 space-y-4"
-              >
+              <div key={boia.id} className="border rounded-xl p-4 space-y-4">
                 <div className="flex gap-4 items-center">
                   <img
                     src={boia.imagem}
@@ -735,10 +760,7 @@ export function Admin({
               const dadosBoia = getDadosDaBoia(data, boia.id);
 
               return (
-                <div
-                  key={boia.id}
-                  className="border rounded-xl p-4 space-y-4"
-                >
+                <div key={boia.id} className="border rounded-xl p-4 space-y-4">
                   <div className="flex items-center gap-3">
                     <img
                       src={boia.imagem}
