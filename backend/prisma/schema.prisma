@@ -1,0 +1,88 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Boia {
+  id            String    @id
+  nome          String
+  descricao     String?
+  instituicao   String?
+  responsavel   String?
+  imagem        String?
+  local         String?
+
+  latitude      Float?
+  longitude     Float?
+  altitude      Float?
+
+  gpsIntegrado  Boolean   @default(false)
+  habilitada    Boolean   @default(true)
+
+  mqtt          Boolean   @default(false)
+  mqttTopico    String?
+
+  lora          Boolean   @default(false)
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  leituras      Leitura[]
+}
+
+model Leitura {
+  id            String    @id @default(cuid())
+
+  boiaId        String
+  boia          Boia      @relation(fields: [boiaId], references: [id])
+
+  timestamp     DateTime
+
+  lat           Float?
+  lon           Float?
+  alt           Float?
+
+  tempAr        Float?
+  umidAr        Float?
+  pressao       Float?
+  indiceUV      Float?
+
+  chuvaAcum     Float?
+
+  ventoVel      Float?
+  ventoDir      Float?
+
+  tempAgua      Float?
+  phAgua        Float?
+  condutivEC    Float?
+  turbidez      Float?
+
+  createdAt     DateTime  @default(now())
+
+  @@index([boiaId])
+  @@index([timestamp])
+}
+
+model Usuario {
+  id            String    @id @default(cuid())
+
+  nome          String
+  email         String    @unique
+  senhaHash     String
+
+  role          UserRole  @default(OPERATOR)
+
+  ativo         Boolean   @default(true)
+
+  createdAt     DateTime  @default(now())
+}
+
+enum UserRole {
+  ADMIN
+  OPERATOR
+  VIEWER
+}

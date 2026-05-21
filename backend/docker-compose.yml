@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: hydra_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: hydra
+      POSTGRES_PASSWORD: hydra123
+      POSTGRES_DB: hydra_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - hydra_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  hydra_postgres_data:

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { socket } from "./services/socket";
 
 import { Sidebar } from "./layout/Sidebar";
 import { Topbar } from "./layout/Topbar";
@@ -127,6 +128,21 @@ function calcularStatusBoia(
 ): StatusBoia {
   if (!leitura) return "offline";
 
+  try {
+    const agora = new Date();
+    const timestampLeitura = new Date(leitura.timestamp.replace(" ", "T"));
+
+    const diferencaMs = agora.getTime() - timestampLeitura.getTime();
+    const diferencaMinutos = diferencaMs / 1000 / 60;
+
+    if (diferencaMinutos > 10) {
+      return "offline";
+    }
+  } catch (error) {
+    console.error("Erro ao validar timestamp:", error);
+    return "offline";
+  }
+
   if (
     sensorAtivo(boia, "phAgua") &&
     ((boia.sensores.phAgua?.minCritico !== undefined &&
@@ -237,6 +253,67 @@ function App() {
   useEffect(() => {
     localStorage.setItem("hydra_admin", JSON.stringify(adminLogado));
   }, [adminLogado]);
+  useEffect(() => {
+  async function carregarLeiturasDoBackend() {
+    try {
+      const resposta = await fetch("http://localhost:3001/api/leituras?limit=1000");
+
+      if (!resposta.ok) {
+        throw new Error("Erro ao buscar leituras do backend");
+      }
+
+      const leituras: EnvironmentalData[] = await resposta.json();
+
+      setData((dadosAtuais) => {
+        const idsExistentes = new Set(
+          dadosAtuais.map(
+            (dado) => `${dado.boiaId}-${dado.timestamp}`
+          )
+        );
+
+        const novasLeituras = leituras.filter(
+          (leitura) =>
+            !idsExistentes.has(`${leitura.boiaId}-${leitura.timestamp}`)
+        );
+
+        return [...dadosAtuais, ...novasLeituras];
+      });
+    } catch (error) {
+      console.error("Erro ao carregar leituras do backend:", error);
+    }
+  }
+
+  carregarLeiturasDoBackend();
+}, []);
+
+  useEffect(() => {
+    socket.on("connect", () => {
+      console.log("Conectado ao backend Socket.IO");
+    });
+
+    socket.on("mqtt:data", (novoDado: EnvironmentalData) => {
+      console.log("Novo dado MQTT:", novoDado);
+
+      setData((oldData) => [...oldData, novoDado]);
+
+      setBoias((oldBoias) =>
+        oldBoias.map((boia) => {
+          if (boia.id !== novoDado.boiaId) return boia;
+
+          return {
+            ...boia,
+            latitude: novoDado.lat ?? boia.latitude,
+            longitude: novoDado.lon ?? boia.longitude,
+          };
+        })
+      );
+    });
+
+    return () => {
+      socket.off("connect");
+      socket.off("mqtt:data");
+    };
+  }, []);
 
   const addData = (newData: EnvironmentalData[]) => {
     setData((oldData) => [...oldData, ...newData]);
