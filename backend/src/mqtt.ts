@@ -16,6 +16,78 @@ async function garantirBoiaExiste(boiaId: string) {
 
   if (boiaExistente) return boiaExistente;
 
+  const sensoresPadrao = {
+    tempAgua: {
+      ativo: true,
+      nome: "Temperatura da água",
+      unidade: "°C",
+      maxAlerta: 30,
+      maxCritico: 35,
+    },
+    phAgua: {
+      ativo: true,
+      nome: "pH da água",
+      unidade: "pH",
+      minAlerta: 6.5,
+      maxAlerta: 8.5,
+      minCritico: 6,
+      maxCritico: 9,
+    },
+    turbidez: {
+      ativo: true,
+      nome: "Turbidez",
+      unidade: "NTU",
+      maxAlerta: 15,
+      maxCritico: 30,
+    },
+    condutivEC: {
+      ativo: true,
+      nome: "Condutividade",
+      unidade: "µS/cm",
+    },
+    tempAr: {
+      ativo: true,
+      nome: "Temperatura do ar",
+      unidade: "°C",
+    },
+    umidAr: {
+      ativo: true,
+      nome: "Umidade do ar",
+      unidade: "%",
+    },
+    pressao: {
+      ativo: true,
+      nome: "Pressão atmosférica",
+      unidade: "hPa",
+    },
+    indiceUV: {
+      ativo: true,
+      nome: "Índice UV",
+      unidade: "",
+    },
+    chuvaAcum: {
+      ativo: true,
+      nome: "Chuva acumulada",
+      unidade: "mm",
+    },
+    ventoVel: {
+      ativo: true,
+      nome: "Velocidade do vento",
+      unidade: "km/h",
+    },
+    ventoDir: {
+      ativo: true,
+      nome: "Direção do vento",
+      unidade: "°",
+    },
+  };
+
+  const comunicacaoPadrao = {
+    mqtt: true,
+    mqttTopico: `Hydra/${boiaId}`,
+    lora: false,
+  };
+
   return prisma.boia.create({
     data: {
       id: boiaId,
@@ -24,8 +96,13 @@ async function garantirBoiaExiste(boiaId: string) {
       instituicao: "Não informado",
       local: "Não informado",
       habilitada: true,
+
       mqtt: true,
       mqttTopico: `Hydra/${boiaId}`,
+      lora: false,
+
+      sensores: sensoresPadrao,
+      comunicacao: comunicacaoPadrao,
     },
   });
 }
@@ -97,7 +174,7 @@ export function iniciarMQTT(io: Server) {
       const json = JSON.parse(mensagem);
 
       const partesTopico = topicRecebido.split("/");
-      const boiaId = partesTopico[partesTopico.length - 1];
+      const boiaId = partesTopico[partesTopico.length - 1].toLowerCase();
 
       const dado: EnvironmentalData = {
         boiaId,

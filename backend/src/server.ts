@@ -3,13 +3,16 @@ import express from "express";
 import cors from "cors";
 import http from "http";
 import { Server } from "socket.io";
+
 import { iniciarMQTT } from "./mqtt";
 import { apiRoutes } from "./routes/api";
+import { authRoutes } from "./routes/auth";
+import { userRoutes } from "./routes/users";
 
 const app = express();
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
 
 const server = http.createServer(app);
 
@@ -34,6 +37,8 @@ app.get("/health", (_req, res) => {
 });
 
 app.use("/api", apiRoutes);
+app.use("/auth", authRoutes);
+app.use("/users", userRoutes);
 
 io.on("connection", (socket) => {
   console.log("Frontend conectado:", socket.id);

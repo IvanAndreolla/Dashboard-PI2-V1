@@ -1,25 +1,43 @@
 import { useState } from "react";
 import { Lock } from "lucide-react";
+import {
+  login,
+  salvarToken,
+  salvarUsuario,
+} from "../services/auth";
 
 interface Props {
   onLogin: () => void;
 }
 
 export function LoginAdmin({ onLogin }: Props) {
-  const [usuario, setUsuario] = useState("");
+  const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [erro, setErro] = useState("");
+  const [carregando, setCarregando] = useState(false);
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
-    if (usuario === "admin" && senha === "hydra123") {
-      setErro("");
-      onLogin();
-      return;
-    }
+    setErro("");
+    setCarregando(true);
 
-    setErro("Usuário ou senha inválidos.");
+    try {
+      const resposta = await login(email, senha);
+
+      salvarToken(resposta.token);
+      salvarUsuario(resposta.usuario);
+
+      onLogin();
+    } catch (error) {
+      if (error instanceof Error) {
+        setErro(error.message);
+      } else {
+        setErro("Erro ao fazer login.");
+      }
+    } finally {
+      setCarregando(false);
+    }
   };
 
   return (
@@ -31,22 +49,25 @@ export function LoginAdmin({ onLogin }: Props) {
           </div>
 
           <h1 className="text-2xl font-bold">Acesso administrativo</h1>
+
           <p className="text-sm text-gray-500 mt-1">
-            Entre para configurar boias e enviar dados.
+            Entre com uma conta autorizada para configurar boias, sensores e usuários.
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Usuário
+              E-mail
             </label>
+
             <input
-              type="text"
-              value={usuario}
-              onChange={(e) => setUsuario(e.target.value)}
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="admin"
+              placeholder="admin@hydra.local"
+              autoComplete="email"
             />
           </div>
 
@@ -54,12 +75,14 @@ export function LoginAdmin({ onLogin }: Props) {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Senha
             </label>
+
             <input
               type="password"
               value={senha}
               onChange={(e) => setSenha(e.target.value)}
               className="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="••••••••"
+              autoComplete="current-password"
             />
           </div>
 
@@ -71,14 +94,15 @@ export function LoginAdmin({ onLogin }: Props) {
 
           <button
             type="submit"
-            className="w-full bg-blue-700 text-white py-2 rounded-lg hover:bg-blue-800 transition"
+            disabled={carregando}
+            className="w-full bg-blue-700 text-white py-2 rounded-lg hover:bg-blue-800 transition disabled:bg-gray-400"
           >
-            Entrar
+            {carregando ? "Entrando..." : "Entrar"}
           </button>
         </form>
 
         <div className="mt-6 text-xs text-gray-400 text-center">
-          Login temporário de desenvolvimento.
+          Acesso restrito a usuários cadastrados.
         </div>
       </div>
     </div>

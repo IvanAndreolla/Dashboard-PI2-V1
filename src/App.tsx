@@ -93,7 +93,7 @@ const boiasIniciais: BoiaConfig[] = [
     status: "offline",
     comunicacao: {
       mqtt: true,
-      mqttTopico: "hydra/boias/ifsc-baia-sul/dados",
+      mqttTopico: "Hydra/ifsc-baia-sul",
       lora: true,
     },
     sensores: sensoresCompletos,
@@ -224,67 +224,133 @@ function normalizarBoiasSalvas(boiasSalvas: BoiaConfig[]): BoiaConfig[] {
   }));
 }
 
+function converterBoiaBackendParaFrontend(boia: any): BoiaConfig {
+  return {
+    id: boia.id,
+    nome: boia.nome || boia.id,
+    descricao: boia.descricao || "",
+    instituicao: boia.instituicao || "Não informado",
+    responsavel: boia.responsavel || "",
+    imagem: boia.imagem || "/assets/boias/medusa.png",
+    local: boia.local || "Não informado",
+
+    latitude: boia.latitude ?? -27.603671,
+    longitude: boia.longitude ?? -48.552147,
+
+    gpsIntegrado: boia.gpsIntegrado ?? false,
+    habilitada: boia.habilitada ?? true,
+    status: "offline",
+
+    comunicacao: boia.comunicacao || {
+      mqtt: boia.mqtt ?? false,
+      mqttTopico: boia.mqttTopico || "",
+      lora: boia.lora ?? false,
+    },
+
+    sensores: boia.sensores || sensoresCompletos,
+  };
+}
+
 function App() {
   const [page, setPage] = useState<Page>("dashboard");
 
-  const [data, setData] = useState<EnvironmentalData[]>(() =>
-    carregarLocalStorage("hydra_data", [])
-  );
+  const [data, setData] = useState<EnvironmentalData[]>([]);
 
   const [boias, setBoias] = useState<BoiaConfig[]>(() =>
-    normalizarBoiasSalvas(carregarLocalStorage("hydra_boias", boiasIniciais))
+    normalizarBoiasSalvas(carregarLocalStorage("hydra_boias", []))
   );
 
-  const [adminLogado, setAdminLogado] = useState<boolean>(() =>
-    carregarLocalStorage("hydra_admin", false)
-  );
+  const [adminLogado, setAdminLogado] = useState(() => {
+    return !!localStorage.getItem("hydra_token");
+  });
 
   const [boiaSelecionada, setBoiaSelecionada] =
     useState<string>("ifsc-baia-sul");
 
-  useEffect(() => {
-    localStorage.setItem("hydra_data", JSON.stringify(data));
-  }, [data]);
 
   useEffect(() => {
     localStorage.setItem("hydra_boias", JSON.stringify(boias));
   }, [boias]);
 
-  useEffect(() => {
-    localStorage.setItem("hydra_admin", JSON.stringify(adminLogado));
-  }, [adminLogado]);
-  useEffect(() => {
-  async function carregarLeiturasDoBackend() {
-    try {
-      const resposta = await fetch("http://localhost:3001/api/leituras?limit=1000");
 
-      if (!resposta.ok) {
-        throw new Error("Erro ao buscar leituras do backend");
+  useEffect(() => {
+    async function carregarLeiturasDoBackend() {
+      try {
+        const resposta = await fetch("http://localhost:3001/api/leituras?limit=1000");
+
+        if (!resposta.ok) {
+          throw new Error("Erro ao buscar leituras do backend");
+        }
+
+        const leituras: EnvironmentalData[] = await resposta.json();
+
+        setData((dadosAtuais) => {
+          const idsExistentes = new Set(
+            dadosAtuais.map((dado) => `${dado.boiaId}-${dado.timestamp}`)
+          );
+
+          const novasLeituras = leituras.filter(
+            (leitura) =>
+              !idsExistentes.has(`${leitura.boiaId}-${leitura.timestamp}`)
+          );
+
+          return [...dadosAtuais, ...novasLeituras];
+        });
+      } catch (error) {
+        console.error("Erro ao carregar leituras do backend:", error);
       }
-
-      const leituras: EnvironmentalData[] = await resposta.json();
-
-      setData((dadosAtuais) => {
-        const idsExistentes = new Set(
-          dadosAtuais.map(
-            (dado) => `${dado.boiaId}-${dado.timestamp}`
-          )
-        );
-
-        const novasLeituras = leituras.filter(
-          (leitura) =>
-            !idsExistentes.has(`${leitura.boiaId}-${leitura.timestamp}`)
-        );
-
-        return [...dadosAtuais, ...novasLeituras];
-      });
-    } catch (error) {
-      console.error("Erro ao carregar leituras do backend:", error);
     }
-  }
 
-  carregarLeiturasDoBackend();
-}, []);
+    carregarLeiturasDoBackend();
+  }, []);
+
+  useEffect(() => {
+    async function carregarBoiasDoBackend() {
+      try {
+        const resposta = await fetch("http://localhost:3001/api/boias");
+
+        if (!resposta.ok) {
+          throw new Error("Erro ao buscar boias do backend");
+        }
+
+        const boiasBackend = await resposta.json();
+
+        if (!Array.isArray(boiasBackend)) return;
+
+        const boiasConvertidas: BoiaConfig[] =
+          boiasBackend.map(converterBoiaBackendParaFrontend);
+
+        setBoias((boiasAtuais) => {
+          const mapa = new Map<string, BoiaConfig>();
+
+          boiasAtuais.forEach((boia) => {
+            mapa.set(boia.id, boia);
+          });
+
+          boiasConvertidas.forEach((boiaBackend) => {
+            const boiaLocal = mapa.get(boiaBackend.id);
+
+            mapa.set(boiaBackend.id, {
+              ...boiaLocal,
+              ...boiaBackend,
+              sensores: boiaBackend.sensores || boiaLocal?.sensores || sensoresCompletos,
+              comunicacao:
+                boiaBackend.comunicacao ||
+                boiaLocal?.comunicacao || {
+                  mqtt: false,
+                },
+            });
+          });
+
+          return Array.from(mapa.values());
+        });
+      } catch (error) {
+        console.error("Erro ao carregar boias do backend:", error);
+      }
+    }
+
+    carregarBoiasDoBackend();
+  }, []);
 
   useEffect(() => {
     socket.on("connect", () => {
@@ -326,6 +392,9 @@ function App() {
   };
 
   const logoutAdmin = () => {
+    localStorage.removeItem("hydra_token");
+    localStorage.removeItem("hydra_usuario");
+
     setAdminLogado(false);
   };
 

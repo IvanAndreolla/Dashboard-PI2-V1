@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { CSVUpload } from "../components/CSVUpload";
 import { ImageSelector } from "../components/ImageSelector";
+import { obterToken } from "../services/auth";
 import {
   BoiaConfig,
   EnvironmentalData,
@@ -17,6 +18,8 @@ interface Props {
   onLogout: () => void;
   onResetBoias: () => void;
 }
+
+const API_URL = "http://localhost:3001/api";
 
 const sensoresPadrao: SensoresBoia = {
   tempAgua: {
@@ -88,18 +91,18 @@ const listaSensores: {
   chave: keyof SensoresBoia;
   titulo: string;
 }[] = [
-  { chave: "tempAgua", titulo: "Temperatura da água" },
-  { chave: "phAgua", titulo: "pH da água" },
-  { chave: "turbidez", titulo: "Turbidez" },
-  { chave: "condutivEC", titulo: "Condutividade" },
-  { chave: "tempAr", titulo: "Temperatura do ar" },
-  { chave: "umidAr", titulo: "Umidade do ar" },
-  { chave: "pressao", titulo: "Pressão atmosférica" },
-  { chave: "indiceUV", titulo: "Índice UV" },
-  { chave: "chuvaAcum", titulo: "Chuva acumulada" },
-  { chave: "ventoVel", titulo: "Velocidade do vento" },
-  { chave: "ventoDir", titulo: "Direção do vento" },
-];
+    { chave: "tempAgua", titulo: "Temperatura da água" },
+    { chave: "phAgua", titulo: "pH da água" },
+    { chave: "turbidez", titulo: "Turbidez" },
+    { chave: "condutivEC", titulo: "Condutividade" },
+    { chave: "tempAr", titulo: "Temperatura do ar" },
+    { chave: "umidAr", titulo: "Umidade do ar" },
+    { chave: "pressao", titulo: "Pressão atmosférica" },
+    { chave: "indiceUV", titulo: "Índice UV" },
+    { chave: "chuvaAcum", titulo: "Chuva acumulada" },
+    { chave: "ventoVel", titulo: "Velocidade do vento" },
+    { chave: "ventoDir", titulo: "Direção do vento" },
+  ];
 
 function gerarId(nome: string) {
   return nome
@@ -129,8 +132,6 @@ function criarBoiaVazia(): BoiaConfig {
       mqtt: false,
       mqttTopico: "",
       lora: false,
-      can: false,
-      serial: false,
     },
     sensores: sensoresPadrao,
   };
@@ -143,6 +144,29 @@ function getDadosDaBoia(data: EnvironmentalData[], boiaId: string) {
 function numeroOuUndefined(valor: string) {
   if (valor.trim() === "") return undefined;
   return Number(valor);
+}
+
+function normalizarBoiaResposta(boia: any): BoiaConfig {
+  return {
+    id: boia.id,
+    nome: boia.nome || boia.id,
+    descricao: boia.descricao || "",
+    instituicao: boia.instituicao || "Não informado",
+    responsavel: boia.responsavel || "",
+    imagem: boia.imagem || "/assets/boias/medusa.png",
+    local: boia.local || "Não informado",
+    latitude: boia.latitude ?? -27.603671,
+    longitude: boia.longitude ?? -48.552147,
+    gpsIntegrado: boia.gpsIntegrado ?? false,
+    habilitada: boia.habilitada ?? true,
+    status: boia.status || "offline",
+    comunicacao: boia.comunicacao || {
+      mqtt: boia.mqtt ?? false,
+      mqttTopico: boia.mqttTopico || "",
+      lora: boia.lora ?? false,
+    },
+    sensores: boia.sensores || sensoresPadrao,
+  };
 }
 
 export function Admin({
@@ -206,7 +230,74 @@ export function Admin({
     setEditandoId(null);
   };
 
-  const salvarBoia = () => {
+  async function salvarBoiaBackend(boia: BoiaConfig) {
+    try {
+      const resposta = await fetch(`${API_URL}/boias`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${obterToken()}`,
+        },
+        body: JSON.stringify(boia),
+      });
+
+      if (!resposta.ok) {
+        throw new Error("Erro ao salvar boia");
+      }
+
+      return normalizarBoiaResposta(await resposta.json());
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao salvar boia no backend");
+      return null;
+    }
+  }
+
+  async function atualizarBoiaBackend(boia: BoiaConfig) {
+    try {
+      const resposta = await fetch(`${API_URL}/boias/${boia.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${obterToken()}`,
+        },
+        body: JSON.stringify(boia),
+      });
+
+      if (!resposta.ok) {
+        throw new Error("Erro ao atualizar boia");
+      }
+
+      return normalizarBoiaResposta(await resposta.json());
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao atualizar boia no backend");
+      return null;
+    }
+  }
+
+  async function excluirBoiaBackend(id: string) {
+    try {
+      const resposta = await fetch(`${API_URL}/boias/${id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${obterToken()}`,
+        },
+      });
+
+      if (!resposta.ok) {
+        throw new Error("Erro ao excluir boia");
+      }
+
+      return true;
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao excluir boia no backend");
+      return false;
+    }
+  }
+
+  const salvarBoia = async () => {
     if (!form.nome.trim()) {
       alert("Informe o nome da boia.");
       return;
@@ -228,7 +319,15 @@ export function Admin({
     };
 
     if (editandoId) {
-      setBoias(boias.map((boia) => (boia.id === editandoId ? boiaFinal : boia)));
+      const boiaAtualizada = await atualizarBoiaBackend(boiaFinal);
+
+      if (!boiaAtualizada) return;
+
+      setBoias(
+        boias.map((boia) =>
+          boia.id === boiaAtualizada.id ? boiaAtualizada : boia
+        )
+      );
     } else {
       const jaExiste = boias.some((boia) => boia.id === idFinal);
 
@@ -237,7 +336,11 @@ export function Admin({
         return;
       }
 
-      setBoias([...boias, boiaFinal]);
+      const boiaSalva = await salvarBoiaBackend(boiaFinal);
+
+      if (!boiaSalva) return;
+
+      setBoias([...boias, boiaSalva]);
     }
 
     limparFormulario();
@@ -254,8 +357,6 @@ export function Admin({
         mqtt: false,
         mqttTopico: "",
         lora: false,
-        can: false,
-        serial: false,
         ...boia.comunicacao,
       },
     });
@@ -264,20 +365,35 @@ export function Admin({
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const alternarBoia = (id: string) => {
+  const alternarBoia = async (id: string) => {
+    const boiaAtual = boias.find((boia) => boia.id === id);
+
+    if (!boiaAtual) return;
+
+    const boiaAtualizada: BoiaConfig = {
+      ...boiaAtual,
+      habilitada: !boiaAtual.habilitada,
+    };
+
+    const resposta = await atualizarBoiaBackend(boiaAtualizada);
+
+    if (!resposta) return;
+
     setBoias(
-      boias.map((boia) =>
-        boia.id === id ? { ...boia, habilitada: !boia.habilitada } : boia
-      )
+      boias.map((boia) => (boia.id === id ? resposta : boia))
     );
   };
 
-  const excluirBoia = (id: string) => {
+  const excluirBoia = async (id: string) => {
     const confirmar = confirm(
       "Deseja realmente excluir esta boia? Os dados carregados dela também serão removidos."
     );
 
     if (!confirmar) return;
+
+    const sucesso = await excluirBoiaBackend(id);
+
+    if (!sucesso) return;
 
     setBoias(boias.filter((boia) => boia.id !== id));
     clearDataByBoia(id);
@@ -340,7 +456,7 @@ export function Admin({
           <div className="bg-white rounded-lg p-4">
             <h3 className="font-bold mb-2">3. Formato CSV esperado</h3>
             <pre className="bg-gray-900 text-green-300 p-3 rounded-lg overflow-auto text-xs mt-2">
-{`timestamp;tempAr;umidAr;pressao;indiceUV;chuvaAcum;ventoVel;ventoDir;tempAgua;phAgua;condutivEC;turbidez
+              {`timestamp;tempAr;umidAr;pressao;indiceUV;chuvaAcum;ventoVel;ventoDir;tempAgua;phAgua;condutivEC;turbidez
 2026-05-01 10:00;25.3;70;1012;5;0;12;180;22.1;7.2;980;12`}
             </pre>
           </div>
@@ -348,12 +464,15 @@ export function Admin({
           <div className="bg-white rounded-lg p-4">
             <h3 className="font-bold mb-2">4. Mensagem MQTT sugerida</h3>
             <pre className="bg-gray-900 text-green-300 p-3 rounded-lg overflow-auto text-xs mt-2">
-{`Tópico:
-hydra/boias/ifsc-baia-sul/dados
+              {`Tópico:
+Hydra/ifsc-baia-sul
 
 Payload JSON:
 {
   "timestamp": "2026-05-01 10:00",
+  "lat": -27.593708,
+  "lon": -48.542835,
+  "alt": 16.6,
   "tempAr": 25.3,
   "umidAr": 70,
   "pressao": 1012,
@@ -497,24 +616,6 @@ Payload JSON:
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"
-                checked={form.comunicacao.can || false}
-                onChange={(e) => atualizarComunicacao("can", e.target.checked)}
-              />
-              CAN
-            </label>
-
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={form.comunicacao.serial || false}
-                onChange={(e) => atualizarComunicacao("serial", e.target.checked)}
-              />
-              Serial
-            </label>
-
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
                 checked={form.gpsIntegrado}
                 onChange={(e) => atualizarCampo("gpsIntegrado", e.target.checked)}
               />
@@ -528,7 +629,7 @@ Payload JSON:
               value={form.comunicacao.mqttTopico || ""}
               onChange={(e) => atualizarComunicacao("mqttTopico", e.target.value)}
               className="w-full border rounded-lg px-3 py-2"
-              placeholder="hydra/boias/boia-ifsc/dados"
+              placeholder="Hydra/ifsc-baia-sul"
             />
           </div>
         </div>

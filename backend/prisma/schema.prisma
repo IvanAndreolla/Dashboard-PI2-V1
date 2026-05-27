@@ -28,6 +28,9 @@ model Boia {
 
   lora          Boolean   @default(false)
 
+  sensores      Json?
+  comunicacao   Json?
+
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -68,17 +71,17 @@ model Leitura {
 }
 
 model Usuario {
-  id            String    @id @default(cuid())
+  id         String   @id @default(cuid())
+  nome       String
+  email      String   @unique
+  senhaHash  String
 
-  nome          String
-  email         String    @unique
-  senhaHash     String
+  role       String   @default("OPERATOR")
 
-  role          UserRole  @default(OPERATOR)
+  ativo      Boolean  @default(true)
 
-  ativo         Boolean   @default(true)
-
-  createdAt     DateTime  @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
 enum UserRole {
