@@ -6,6 +6,7 @@ import {
   Settings,
   Map,
   Eye,
+  Waves,
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -39,47 +40,48 @@ function NavItem({
     <button
       onClick={onClick}
       className={clsx(
-        "flex items-center gap-3 w-full px-4 py-3 rounded-xl transition-all text-left",
-        "hover:bg-white/10",
+        "flex items-center gap-3 w-full px-4 py-3 rounded-2xl transition-all duration-300 group",
         active
-          ? "bg-white text-blue-900 shadow-md font-semibold"
-          : "text-blue-100"
+          ? "bg-white text-blue-600 shadow-lg font-bold translate-x-2"
+          : "text-blue-50 hover:bg-white/10 hover:translate-x-1"
       )}
     >
-      {icon}
-      <span>{label}</span>
+      <div className={clsx(
+        "p-2 rounded-xl transition-colors",
+        active ? "bg-blue-50 text-blue-600" : "text-blue-100 group-hover:text-white"
+      )}>
+        {icon}
+      </div>
+      <span className="tracking-tight">{label}</span>
     </button>
   );
 }
 
 export function Sidebar({ page, setPage }: Props) {
   return (
-    <aside className="w-72 h-screen bg-gradient-to-b from-blue-900 via-blue-800 to-blue-900 text-white flex flex-col">
-      <div className="w-full h-60 overflow-hidden">
-        <img
-          src="/assets/hydra.png"
-          alt="Hydra"
-          className="w-full h-full object-cover object-center"
-        />
-      </div>
-
-      <div className="px-4 py-4 text-center border-b border-blue-700/40">
-        <h1 className="text-lg font-bold">HYDRA</h1>
-        <p className="text-xs text-blue-200">Projeto Águas Vivas</p>
-
-        <div className="mt-3 flex justify-center">
-          <img
-            src="/assets/logoifscvertical.jpeg"
-            alt="IFSC"
-            className="w-20 object-contain"
-          />
+    <aside className="w-72 min-h-screen bg-gradient-to-b from-blue-700 to-sky-800 text-white flex flex-col sticky top-0 self-start shadow-2xl">
+      {/* BRANDING */}
+      <div className="relative p-2 flex flex-col items-center group border-b border-white/10">
+        <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+        <div className="relative z-10 w-full flex flex-col items-center">
+          <div className="w-full px-1 mb-4 drop-shadow-[0_10px_20px_rgba(0,0,0,0.4)] transform group-hover:scale-105 transition-transform duration-700">
+             <img src="/assets/hydra.png" alt="Hydra Logo" className="w-full h-auto object-contain" />
+          </div>
+          <h1 className="text-4xl font-black tracking-tighter text-white drop-shadow-lg">
+            HYDRA
+          </h1>
+          <p className="text-[11px] font-black uppercase tracking-[0.5em] text-blue-100 mt-2 opacity-80 text-center">
+            Águas Vivas
+          </p>
         </div>
       </div>
 
-      <nav className="flex-1 p-4 space-y-2">
+      {/* NAVIGATION */}
+      <nav className="flex-1 px-4 space-y-2 py-4">
+        <div className="text-[10px] font-black uppercase tracking-widest text-blue-200/50 px-4 mb-4">Monitoramento</div>
         <NavItem
           icon={<Home size={20} />}
-          label="Dashboard"
+          label="Visão Geral"
           active={page === "dashboard"}
           onClick={() => setPage("dashboard")}
         />
@@ -92,6 +94,14 @@ export function Sidebar({ page, setPage }: Props) {
         />
 
         <NavItem
+          icon={<Map size={20} />}
+          label="Mapa Interativo"
+          active={page === "mapa"}
+          onClick={() => setPage("mapa")}
+        />
+
+        <div className="text-[10px] font-black uppercase tracking-widest text-blue-200/50 px-4 mb-4 mt-8">Dados</div>
+        <NavItem
           icon={<Database size={20} />}
           label="Boias"
           active={page === "boias" || page === "boiaDetalhe"}
@@ -99,15 +109,8 @@ export function Sidebar({ page, setPage }: Props) {
         />
 
         <NavItem
-          icon={<Map size={20} />}
-          label="Mapa"
-          active={page === "mapa"}
-          onClick={() => setPage("mapa")}
-        />
-
-        <NavItem
           icon={<AlertTriangle size={20} />}
-          label="Alertas"
+          label="Painel Alertas"
           active={page === "alertas"}
           onClick={() => setPage("alertas")}
         />
@@ -119,16 +122,27 @@ export function Sidebar({ page, setPage }: Props) {
           onClick={() => setPage("historico")}
         />
 
+        <div className="text-[10px] font-black uppercase tracking-widest text-blue-200/50 px-4 mb-4 mt-8">Sistema</div>
         <NavItem
           icon={<Settings size={20} />}
-          label="Admin"
+          label="Administração"
           active={page === "admin"}
           onClick={() => setPage("admin")}
         />
       </nav>
 
-      <div className="p-4 text-center text-xs text-blue-200 border-t border-blue-700/40">
-        Sistema de Monitoramento Ambiental
+      {/* FOOTER */}
+      <div className="p-6">
+        <div className="bg-white rounded-3xl p-5 shadow-inner flex flex-col items-center">
+           <img
+             src="/assets/logoifscvertical.jpeg"
+             alt="IFSC"
+             className="w-16 mb-3"
+           />
+           <p className="text-[10px] font-black text-blue-900 uppercase tracking-wider text-center leading-tight">
+             Engenharia Eletrônica<br/>IFSC - PI2
+           </p>
+        </div>
       </div>
     </aside>
   );

@@ -3,12 +3,12 @@
 // Data: 14/10/2024
 // ========================================
 
-import { Cloud, Wind, Droplets, Sun } from 'lucide-react';
+import { Cloud, Wind, Sun } from 'lucide-react';
 import {
   LineChart, Line,
   BarChart, Bar,
   XAxis, YAxis,
-  CartesianGrid, Tooltip, Legend,
+  CartesianGrid, Tooltip,
   ResponsiveContainer
 } from 'recharts';
 

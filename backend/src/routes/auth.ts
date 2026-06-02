@@ -45,6 +45,15 @@ authRoutes.post("/login", async (req, res) => {
       role: usuario.role,
     });
 
+    await prisma.auditLog.create({
+      data: {
+        usuarioId: usuario.id,
+        acao: "LOGIN",
+        ip: req.ip,
+        detalhes: { email: usuario.email },
+      }
+    });
+
     return res.json({
       token,
       usuario: {

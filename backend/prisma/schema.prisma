@@ -66,6 +66,7 @@ model Leitura {
 
   createdAt     DateTime  @default(now())
 
+  @@unique([boiaId, timestamp])
   @@index([boiaId])
   @@index([timestamp])
 }
@@ -88,4 +89,13 @@ enum UserRole {
   ADMIN
   OPERATOR
   VIEWER
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  usuarioId   String?
+  acao        String
+  detalhes    Json?
+  ip          String?
+  createdAt   DateTime @default(now())
 }

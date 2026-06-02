@@ -127,7 +127,7 @@ function baixarCSV(
 
   const link = document.createElement("a");
   link.href = url;
-  link.download = `historico_${boiaNome.toLowerCase().replaceAll(" ", "_")}.csv`;
+  link.download = `historico_${boiaNome.toLowerCase().split(" ").join("_")}.csv`;
   link.click();
 
   URL.revokeObjectURL(url);
@@ -172,7 +172,6 @@ export function Historico({ boias, data }: Props) {
 
   const chartData = dadosFiltrados.map((leitura) => ({
     name: formatarDataGrafico(leitura.timestamp),
-    timestamp: leitura.timestamp,
     ...leitura,
   }));
 

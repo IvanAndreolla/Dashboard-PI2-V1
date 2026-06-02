@@ -70,419 +70,168 @@ const sensoresCompletos: SensoresBoia = {
   ventoDir: sensor(true, "Direção do vento", "°"),
 };
 
-const sensoresAguaBasicos: SensoresBoia = {
-  tempAgua: sensoresCompletos.tempAgua,
-  phAgua: sensoresCompletos.phAgua,
-  turbidez: sensoresCompletos.turbidez,
-  condutivEC: sensoresCompletos.condutivEC,
-};
-
-const boiasIniciais: BoiaConfig[] = [
-  {
-    id: "ifsc-baia-sul",
-    nome: "Boia IFSC Baía Sul",
-    descricao: "Boia de monitoramento ambiental do IFSC para operação na Baía Sul.",
-    instituicao: "IFSC",
-    responsavel: "Equipe do Projeto Integrador 2",
-    imagem: "/assets/boias/medusa.png",
-    local: "Baía Sul",
-    latitude: -27.603671,
-    longitude: -48.552147,
-    gpsIntegrado: false,
-    habilitada: true,
-    status: "offline",
-    comunicacao: {
-      mqtt: true,
-      mqttTopico: "Hydra/ifsc-baia-sul",
-      lora: true,
-    },
-    sensores: sensoresCompletos,
-  },
-  {
-    id: "ufsc-lagoa-peri",
-    nome: "Boia UFSC Lagoa do Peri",
-    descricao: "Boia de monitoramento ambiental localizada na Lagoa do Peri.",
-    instituicao: "UFSC",
-    responsavel: "UFSC",
-    imagem: "/assets/boias/netuno.png",
-    local: "Lagoa do Peri",
-    latitude: -27.725,
-    longitude: -48.508,
-    gpsIntegrado: false,
-    habilitada: true,
-    status: "offline",
-    comunicacao: {
-      mqtt: false,
-    },
-    sensores: sensoresAguaBasicos,
-  },
-];
-
 function sensorAtivo(boia: BoiaConfig, chave: keyof SensoresBoia) {
-  return boia.sensores[chave]?.ativo === true;
+  return boia && boia.sensores && boia.sensores[chave]?.ativo === true;
 }
 
 function calcularStatusBoia(
   leitura: EnvironmentalData | undefined,
   boia: BoiaConfig
 ): StatusBoia {
-  if (!leitura) return "offline";
+  if (!leitura || !boia) return "offline";
 
   try {
     const agora = new Date();
-    const timestampLeitura = new Date(leitura.timestamp.replace(" ", "T"));
+    const timestampLeitura = new Date(leitura.timestamp.includes('T') ? leitura.timestamp : leitura.timestamp.replace(" ", "T"));
+
+    if (isNaN(timestampLeitura.getTime())) return "offline";
 
     const diferencaMs = agora.getTime() - timestampLeitura.getTime();
     const diferencaMinutos = diferencaMs / 1000 / 60;
 
-    if (diferencaMinutos > 10) {
+    if (diferencaMinutos > 15) {
       return "offline";
     }
   } catch (error) {
-    console.error("Erro ao validar timestamp:", error);
     return "offline";
   }
 
+  // Critical checks
   if (
-    sensorAtivo(boia, "phAgua") &&
-    ((boia.sensores.phAgua?.minCritico !== undefined &&
-      leitura.phAgua < boia.sensores.phAgua.minCritico) ||
-      (boia.sensores.phAgua?.maxCritico !== undefined &&
-        leitura.phAgua > boia.sensores.phAgua.maxCritico))
-  ) {
-    return "critico";
-  }
+    sensorAtivo(boia, "phAgua") && leitura.phAgua != null &&
+    ((boia.sensores.phAgua?.minCritico !== undefined && leitura.phAgua < boia.sensores.phAgua.minCritico) ||
+      (boia.sensores.phAgua?.maxCritico !== undefined && leitura.phAgua > boia.sensores.phAgua.maxCritico))
+  ) return "critico";
 
-  if (
-    sensorAtivo(boia, "turbidez") &&
-    boia.sensores.turbidez?.maxCritico !== undefined &&
-    leitura.turbidez > boia.sensores.turbidez.maxCritico
-  ) {
-    return "critico";
-  }
+  if (sensorAtivo(boia, "turbidez") && leitura.turbidez != null && boia.sensores.turbidez?.maxCritico !== undefined && leitura.turbidez > boia.sensores.turbidez.maxCritico) return "critico";
+  if (sensorAtivo(boia, "tempAgua") && leitura.tempAgua != null && boia.sensores.tempAgua?.maxCritico !== undefined && leitura.tempAgua > boia.sensores.tempAgua.maxCritico) return "critico";
 
+  // Alerta checks
   if (
-    sensorAtivo(boia, "tempAgua") &&
-    boia.sensores.tempAgua?.maxCritico !== undefined &&
-    leitura.tempAgua > boia.sensores.tempAgua.maxCritico
-  ) {
-    return "critico";
-  }
+    sensorAtivo(boia, "phAgua") && leitura.phAgua != null &&
+    ((boia.sensores.phAgua?.minAlerta !== undefined && leitura.phAgua < boia.sensores.phAgua.minAlerta) ||
+      (boia.sensores.phAgua?.maxAlerta !== undefined && leitura.phAgua > boia.sensores.phAgua.maxAlerta))
+  ) return "alerta";
 
-  if (
-    sensorAtivo(boia, "phAgua") &&
-    ((boia.sensores.phAgua?.minAlerta !== undefined &&
-      leitura.phAgua < boia.sensores.phAgua.minAlerta) ||
-      (boia.sensores.phAgua?.maxAlerta !== undefined &&
-        leitura.phAgua > boia.sensores.phAgua.maxAlerta))
-  ) {
-    return "alerta";
-  }
-
-  if (
-    sensorAtivo(boia, "turbidez") &&
-    boia.sensores.turbidez?.maxAlerta !== undefined &&
-    leitura.turbidez > boia.sensores.turbidez.maxAlerta
-  ) {
-    return "alerta";
-  }
-
-  if (
-    sensorAtivo(boia, "tempAgua") &&
-    boia.sensores.tempAgua?.maxAlerta !== undefined &&
-    leitura.tempAgua > boia.sensores.tempAgua.maxAlerta
-  ) {
-    return "alerta";
-  }
+  if (sensorAtivo(boia, "turbidez") && leitura.turbidez != null && boia.sensores.turbidez?.maxAlerta !== undefined && leitura.turbidez > boia.sensores.turbidez.maxAlerta) return "alerta";
+  if (sensorAtivo(boia, "tempAgua") && leitura.tempAr != null && boia.sensores.tempAgua?.maxAlerta !== undefined && leitura.tempAgua > boia.sensores.tempAgua.maxAlerta) return "alerta";
 
   return "ok";
 }
 
-function carregarLocalStorage<T>(chave: string, fallback: T): T {
-  try {
-    const valor = localStorage.getItem(chave);
-    if (!valor) return fallback;
-    return JSON.parse(valor);
-  } catch {
-    return fallback;
-  }
-}
-
-function normalizarBoiasSalvas(boiasSalvas: BoiaConfig[]): BoiaConfig[] {
-  return boiasSalvas.map((boia) => ({
-    ...boia,
-    descricao: boia.descricao || "",
-    instituicao: boia.instituicao || "Não informado",
-    responsavel: boia.responsavel || "",
-    local: boia.local || "Não informado",
-    imagem: boia.imagem || "/assets/boias/medusa.png",
-    latitude: boia.latitude ?? -27.603671,
-    longitude: boia.longitude ?? -48.552147,
-    gpsIntegrado: boia.gpsIntegrado ?? false,
-    comunicacao: boia.comunicacao || { mqtt: false },
-    sensores: boia.sensores || sensoresCompletos,
-  }));
-}
-
 function converterBoiaBackendParaFrontend(boia: any): BoiaConfig {
+  const latPadrao = -27.603671 + (Math.random() - 0.5) * 0.01;
+  const lonPadrao = -48.552147 + (Math.random() - 0.5) * 0.01;
+
   return {
-    id: boia.id,
-    nome: boia.nome || boia.id,
+    id: boia.id || 'desconhecida',
+    nome: boia.nome || boia.id || 'Boia sem Nome',
     descricao: boia.descricao || "",
     instituicao: boia.instituicao || "Não informado",
     responsavel: boia.responsavel || "",
     imagem: boia.imagem || "/assets/boias/medusa.png",
     local: boia.local || "Não informado",
-
-    latitude: boia.latitude ?? -27.603671,
-    longitude: boia.longitude ?? -48.552147,
-
+    latitude: boia.latitude ?? latPadrao,
+    longitude: boia.longitude ?? lonPadrao,
     gpsIntegrado: boia.gpsIntegrado ?? false,
     habilitada: boia.habilitada ?? true,
     status: "offline",
-
     comunicacao: boia.comunicacao || {
       mqtt: boia.mqtt ?? false,
       mqttTopico: boia.mqttTopico || "",
       lora: boia.lora ?? false,
     },
-
     sensores: boia.sensores || sensoresCompletos,
   };
 }
 
 function App() {
   const [page, setPage] = useState<Page>("dashboard");
-
   const [data, setData] = useState<EnvironmentalData[]>([]);
-
-  const [boias, setBoias] = useState<BoiaConfig[]>(() =>
-    normalizarBoiasSalvas(carregarLocalStorage("hydra_boias", []))
-  );
-
-  const [adminLogado, setAdminLogado] = useState(() => {
-    return !!localStorage.getItem("hydra_token");
-  });
-
-  const [boiaSelecionada, setBoiaSelecionada] =
-    useState<string>("ifsc-baia-sul");
-
+  const [boias, setBoias] = useState<BoiaConfig[]>([]);
+  const [adminLogado, setAdminLogado] = useState(() => !!localStorage.getItem("hydra_token"));
+  const [boiaSelecionada, setBoiaSelecionada] = useState<string>("ifsc-baia-sul");
 
   useEffect(() => {
-    localStorage.setItem("hydra_boias", JSON.stringify(boias));
-  }, [boias]);
-
-
-  useEffect(() => {
-    async function carregarLeiturasDoBackend() {
+    async function loadData() {
       try {
-        const resposta = await fetch("http://localhost:3001/api/leituras?limit=1000");
-
-        if (!resposta.ok) {
-          throw new Error("Erro ao buscar leituras do backend");
+        const res = await fetch("/api/leituras?limit=1000");
+        if (res.ok) {
+          const leituras = await res.json();
+          if (Array.isArray(leituras)) setData(leituras);
         }
-
-        const leituras: EnvironmentalData[] = await resposta.json();
-
-        setData((dadosAtuais) => {
-          const idsExistentes = new Set(
-            dadosAtuais.map((dado) => `${dado.boiaId}-${dado.timestamp}`)
-          );
-
-          const novasLeituras = leituras.filter(
-            (leitura) =>
-              !idsExistentes.has(`${leitura.boiaId}-${leitura.timestamp}`)
-          );
-
-          return [...dadosAtuais, ...novasLeituras];
-        });
-      } catch (error) {
-        console.error("Erro ao carregar leituras do backend:", error);
-      }
+      } catch (e) { console.error(e); }
     }
-
-    carregarLeiturasDoBackend();
+    loadData();
   }, []);
 
   useEffect(() => {
-    async function carregarBoiasDoBackend() {
+    async function loadBoias() {
       try {
-        const resposta = await fetch("http://localhost:3001/api/boias");
-
-        if (!resposta.ok) {
-          throw new Error("Erro ao buscar boias do backend");
+        const res = await fetch("/api/boias");
+        if (res.ok) {
+          const bks = await res.json();
+          if (Array.isArray(bks)) setBoias(bks.map(converterBoiaBackendParaFrontend));
         }
-
-        const boiasBackend = await resposta.json();
-
-        if (!Array.isArray(boiasBackend)) return;
-
-        const boiasConvertidas: BoiaConfig[] =
-          boiasBackend.map(converterBoiaBackendParaFrontend);
-
-        setBoias((boiasAtuais) => {
-          const mapa = new Map<string, BoiaConfig>();
-
-          boiasAtuais.forEach((boia) => {
-            mapa.set(boia.id, boia);
-          });
-
-          boiasConvertidas.forEach((boiaBackend) => {
-            const boiaLocal = mapa.get(boiaBackend.id);
-
-            mapa.set(boiaBackend.id, {
-              ...boiaLocal,
-              ...boiaBackend,
-              sensores: boiaBackend.sensores || boiaLocal?.sensores || sensoresCompletos,
-              comunicacao:
-                boiaBackend.comunicacao ||
-                boiaLocal?.comunicacao || {
-                  mqtt: false,
-                },
-            });
-          });
-
-          return Array.from(mapa.values());
-        });
-      } catch (error) {
-        console.error("Erro ao carregar boias do backend:", error);
-      }
+      } catch (e) { console.error(e); }
     }
-
-    carregarBoiasDoBackend();
+    loadBoias();
   }, []);
 
   useEffect(() => {
-    socket.on("connect", () => {
-      console.log("Conectado ao backend Socket.IO");
+    socket.on("mqtt:data", (novo: EnvironmentalData) => {
+      setData(prev => [...prev, novo]);
+      setBoias(prev => {
+        const exists = prev.some(b => b.id === novo.boiaId);
+        if (!exists) {
+          fetch("/api/boias").then(r => r.json()).then(bks => {
+            if (Array.isArray(bks)) setBoias(bks.map(converterBoiaBackendParaFrontend));
+          });
+          return prev;
+        }
+        return prev.map(b => b.id === novo.boiaId ? { ...b, latitude: novo.lat ?? b.latitude, longitude: novo.lon ?? b.longitude } : b);
+      });
     });
 
-    socket.on("mqtt:data", (novoDado: EnvironmentalData) => {
-      console.log("Novo dado MQTT:", novoDado);
-
-      setData((oldData) => [...oldData, novoDado]);
-
-      setBoias((oldBoias) =>
-        oldBoias.map((boia) => {
-          if (boia.id !== novoDado.boiaId) return boia;
-
-          return {
-            ...boia,
-            latitude: novoDado.lat ?? boia.latitude,
-            longitude: novoDado.lon ?? boia.longitude,
-          };
-        })
-      );
+    socket.on("boia:update", (up: any) => {
+      setBoias(prev => prev.map(b => b.id === up.id ? { ...b, ...up } : b));
     });
 
     return () => {
-      socket.off("connect");
       socket.off("mqtt:data");
+      socket.off("boia:update");
     };
   }, []);
-
-  const addData = (newData: EnvironmentalData[]) => {
-    setData((oldData) => [...oldData, ...newData]);
-  };
-
-  const clearDataByBoia = (boiaId: string) => {
-    setData((oldData) =>
-      oldData.filter((leitura) => leitura.boiaId !== boiaId)
-    );
-  };
 
   const logoutAdmin = () => {
     localStorage.removeItem("hydra_token");
     localStorage.removeItem("hydra_usuario");
-
     setAdminLogado(false);
   };
 
-  const resetBoias = () => {
-    setBoias(boiasIniciais);
-  };
-
-  const boiasAtualizadas: BoiaConfig[] = boias.map((boia) => {
-    const dadosDaBoia = data.filter((leitura) => leitura.boiaId === boia.id);
-    const ultimaLeitura = dadosDaBoia[dadosDaBoia.length - 1];
-
-    return {
-      ...boia,
-      status: calcularStatusBoia(ultimaLeitura, boia),
-    };
+  const boiasAtualizadas = boias.map(b => {
+    const readings = data.filter(d => d.boiaId === b.id);
+    return { ...b, status: calcularStatusBoia(readings[readings.length - 1], b) };
   });
 
-  const boiaAtual = boiasAtualizadas.find(
-    (boia) => boia.id === boiaSelecionada
-  );
-
-  const dadosBoiaAtual = data.filter(
-    (leitura) => leitura.boiaId === boiaSelecionada
-  );
+  const boiaAtual = boiasAtualizadas.find(b => b.id === boiaSelecionada);
+  const readingsAtual = data.filter(d => d.boiaId === boiaSelecionada);
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-gray-50 font-sans">
       <Sidebar page={page} setPage={setPage} />
-
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col overflow-hidden">
         {page !== "publico" && <Topbar data={data} />}
-
-        {page === "dashboard" && (
-          <Dashboard data={data} boias={boiasAtualizadas} />
-        )}
-
-        {page === "publico" && (
-          <Publico data={data} boias={boiasAtualizadas} />
-        )}
-
-        {page === "boias" && (
-          <Boias
-            boias={boiasAtualizadas}
-            setBoiaSelecionada={setBoiaSelecionada}
-            setPage={setPage}
-          />
-        )}
-
-        {page === "boiaDetalhe" && boiaAtual && (
-          <BoiaDetalhe
-            boia={boiaAtual}
-            data={dadosBoiaAtual}
-            setPage={setPage}
-          />
-        )}
-
-        {page === "mapa" && (
-          <Mapa
-            boias={boiasAtualizadas}
-            data={data}
-            setBoiaSelecionada={setBoiaSelecionada}
-            setPage={setPage}
-          />
-        )}
-
-        {page === "alertas" && (
-          <Alertas boias={boiasAtualizadas} data={data} />
-        )}
-
-        {page === "historico" && (
-          <Historico boias={boiasAtualizadas} data={data} />
-        )}
-
-        {page === "admin" && !adminLogado && (
-          <LoginAdmin onLogin={() => setAdminLogado(true)} />
-        )}
-
-        {page === "admin" && adminLogado && (
-          <Admin
-            boias={boiasAtualizadas}
-            setBoias={setBoias}
-            data={data}
-            addData={addData}
-            clearDataByBoia={clearDataByBoia}
-            onLogout={logoutAdmin}
-            onResetBoias={resetBoias}
-          />
-        )}
+        <main className="flex-1 overflow-y-auto">
+          {page === "dashboard" && <Dashboard data={data} boias={boiasAtualizadas} />}
+          {page === "publico" && <Publico data={data} boias={boiasAtualizadas} />}
+          {page === "boias" && <Boias boias={boiasAtualizadas} setBoiaSelecionada={setBoiaSelecionada} setPage={setPage} />}
+          {page === "boiaDetalhe" && boiaAtual && <BoiaDetalhe boia={boiaAtual} data={readingsAtual} setPage={setPage} />}
+          {page === "mapa" && <Mapa boias={boiasAtualizadas} data={data} setBoiaSelecionada={setBoiaSelecionada} setPage={setPage} />}
+          {page === "alertas" && <Alertas boias={boiasAtualizadas} data={data} />}
+          {page === "historico" && <Historico boias={boiasAtualizadas} data={data} />}
+          {page === "admin" && (!adminLogado ? <LoginAdmin onLogin={() => setAdminLogado(true)} /> : <Admin boias={boiasAtualizadas} setBoias={setBoias} data={data} addData={d => setData(p => [...p, ...d])} clearDataByBoia={id => setData(p => p.filter(d => d.boiaId !== id))} onLogout={logoutAdmin} />)}
+        </main>
       </div>
     </div>
   );

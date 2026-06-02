@@ -108,33 +108,59 @@ async function garantirBoiaExiste(boiaId: string) {
 }
 
 async function salvarLeitura(dado: EnvironmentalData) {
-  await garantirBoiaExiste(dado.boiaId);
+  const boia = await garantirBoiaExiste(dado.boiaId);
+  const timestamp = converterTimestamp(dado.timestamp);
 
-  return prisma.leitura.create({
-    data: {
+  const dadosLeitura = {
+    lat: dado.lat,
+    lon: dado.lon,
+    alt: dado.alt,
+
+    tempAr: dado.tempAr,
+    umidAr: dado.umidAr,
+    pressao: dado.pressao,
+    indiceUV: dado.indiceUV,
+
+    chuvaAcum: dado.chuvaAcum,
+
+    ventoVel: dado.ventoVel,
+    ventoDir: dado.ventoDir,
+
+    tempAgua: dado.tempAgua,
+    phAgua: dado.phAgua,
+    condutivEC: dado.condutivEC,
+    turbidez: dado.turbidez,
+  };
+
+  const leitura = await prisma.leitura.upsert({
+    where: {
+      boiaId_timestamp: {
+        boiaId: dado.boiaId,
+        timestamp: timestamp,
+      }
+    },
+    update: dadosLeitura,
+    create: {
       boiaId: dado.boiaId,
-      timestamp: converterTimestamp(dado.timestamp),
-
-      lat: dado.lat,
-      lon: dado.lon,
-      alt: dado.alt,
-
-      tempAr: dado.tempAr,
-      umidAr: dado.umidAr,
-      pressao: dado.pressao,
-      indiceUV: dado.indiceUV,
-
-      chuvaAcum: dado.chuvaAcum,
-
-      ventoVel: dado.ventoVel,
-      ventoDir: dado.ventoDir,
-
-      tempAgua: dado.tempAgua,
-      phAgua: dado.phAgua,
-      condutivEC: dado.condutivEC,
-      turbidez: dado.turbidez,
+      timestamp: timestamp,
+      ...dadosLeitura,
     },
   });
+
+  if (dado.lat !== undefined && dado.lon !== undefined) {
+    await prisma.boia.update({
+      where: {
+        id: boia.id,
+      },
+      data: {
+        latitude: dado.lat,
+        longitude: dado.lon,
+        altitude: dado.alt ?? null,
+      },
+    });
+  }
+
+  return leitura;
 }
 
 export function iniciarMQTT(io: Server) {
@@ -144,16 +170,22 @@ export function iniciarMQTT(io: Server) {
   const password = process.env.MQTT_PASSWORD;
   const topic = process.env.MQTT_TOPIC || "Hydra/#";
 
-  if (!host || !port || !username || !password) {
-    console.error("Configurações MQTT ausentes no .env");
+  if (!host || !port) {
+    console.error("Configurações de HOST ou PORT do MQTT ausentes no .env");
     return;
   }
 
-  const client = mqtt.connect(`${host}:${port}`, {
-    username,
-    password,
+  const options: mqtt.IClientOptions = {
     reconnectPeriod: 3000,
-  });
+  };
+
+  if (username) options.username = username;
+  if (password) options.password = password;
+
+  const connectionUrl = `${host}:${port}`;
+  console.log(`Tentando conectar ao broker MQTT em: ${connectionUrl}`);
+
+  const client = mqtt.connect(connectionUrl, options);
 
   client.on("connect", () => {
     console.log("Conectado ao broker MQTT");
@@ -204,13 +236,22 @@ export function iniciarMQTT(io: Server) {
       console.log("Dado MQTT salvo no banco:", dado);
 
       io.emit("mqtt:data", dado);
+
+      if (dado.lat !== undefined && dado.lon !== undefined) {
+        io.emit("boia:update", {
+          id: dado.boiaId,
+          latitude: dado.lat,
+          longitude: dado.lon,
+          altitude: dado.alt ?? null,
+        });
+      }
     } catch (error) {
       console.error("Erro ao processar mensagem MQTT:", error);
     }
   });
 
   client.on("error", (err) => {
-    console.error("Erro MQTT:", err.message);
+    console.error("Erro MQTT (detalhado):", err);
   });
 
   client.on("reconnect", () => {

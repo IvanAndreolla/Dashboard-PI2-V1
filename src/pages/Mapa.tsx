@@ -24,15 +24,6 @@ interface Props {
   setPage: (page: Page) => void;
 }
 
-const posicoesBoias: Record<string, { lat: number; lng: number }> = {
-  medusa: { lat: -27.603671, lng: -48.552147 },
-  netuno: { lat: -27.599, lng: -48.464 },
-  hipocampo: { lat: -27.594, lng: -48.462 },
-  nautilus: { lat: -27.601, lng: -48.469 },
-  kraken: { lat: -27.592, lng: -48.466 },
-  ostradamus: { lat: -27.598, lng: -48.471 },
-};
-
 function getCorStatus(status: string) {
   if (status === "critico") return "#dc2626";
   if (status === "alerta") return "#f59e0b";
@@ -133,16 +124,16 @@ export function Mapa({ boias, data, setBoiaSelecionada, setPage }: Props) {
             </LayersControl>
 
             {boiasAtivas.map((boia) => {
-              const pos = posicoesBoias[boia.id];
               const ultima = getUltimaLeitura(data, boia.id);
               const corStatus = getCorStatus(boia.status);
 
-              if (!pos) return null;
+              // Use a loose equality check to catch null or undefined
+              if (boia.latitude == null || boia.longitude == null) return null;
 
               return (
                 <Marker
-                  key={boia.id}
-                  position={[pos.lat, pos.lng]}
+                  key={`${boia.id}-${boia.latitude}-${boia.longitude}`} // Changing key forces re-render if position changes
+                  position={[boia.latitude, boia.longitude]}
                   icon={criarIcone(boia.status)}
                 >
                   <Popup>

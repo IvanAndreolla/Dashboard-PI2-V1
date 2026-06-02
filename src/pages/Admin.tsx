@@ -2,6 +2,8 @@ import { useState } from "react";
 import { CSVUpload } from "../components/CSVUpload";
 import { ImageSelector } from "../components/ImageSelector";
 import { obterToken } from "../services/auth";
+import { UsuariosAdmin } from "../components/UsuariosAdmin";
+import { LogsAuditoria } from "../components/LogsAuditoria";
 import {
   BoiaConfig,
   EnvironmentalData,
@@ -16,10 +18,9 @@ interface Props {
   addData: (data: EnvironmentalData[]) => void;
   clearDataByBoia: (boiaId: string) => void;
   onLogout: () => void;
-  onResetBoias: () => void;
 }
 
-const API_URL = "http://localhost:3001/api";
+const API_URL = "/api";
 
 const sensoresPadrao: SensoresBoia = {
   tempAgua: {
@@ -176,10 +177,10 @@ export function Admin({
   addData,
   clearDataByBoia,
   onLogout,
-  onResetBoias,
 }: Props) {
   const [form, setForm] = useState<BoiaConfig>(criarBoiaVazia());
   const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [abaAtual, setAbaAtual] = useState<"boias" | "usuarios" | "logs">("boias");
 
   const atualizarCampo = <K extends keyof BoiaConfig>(
     campo: K,
@@ -354,9 +355,6 @@ export function Admin({
         ...boia.sensores,
       },
       comunicacao: {
-        mqtt: false,
-        mqttTopico: "",
-        lora: false,
         ...boia.comunicacao,
       },
     });
@@ -403,6 +401,12 @@ export function Admin({
     }
   };
 
+  const usuarioLogado = JSON.parse(
+    localStorage.getItem("hydra_usuario") || "{}"
+  );
+
+  const isAdmin = usuarioLogado.role === "ADMIN";
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -415,13 +419,6 @@ export function Admin({
 
         <div className="flex gap-2">
           <button
-            onClick={onResetBoias}
-            className="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition"
-          >
-            Restaurar boias padrão
-          </button>
-
-          <button
             onClick={onLogout}
             className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition"
           >
@@ -430,7 +427,36 @@ export function Admin({
         </div>
       </div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 space-y-4">
+      {localStorage.getItem("hydra_usuario") &&
+        JSON.parse(localStorage.getItem("hydra_usuario") || "{}").role === "ADMIN" && (
+          <div className="flex gap-4 border-b pb-4 mb-6">
+            <button
+              onClick={() => setAbaAtual("boias")}
+              className={`font-semibold pb-2 ${abaAtual === "boias" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-500"}`}
+            >
+              Gerenciar Boias
+            </button>
+            <button
+              onClick={() => setAbaAtual("usuarios")}
+              className={`font-semibold pb-2 ${abaAtual === "usuarios" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-500"}`}
+            >
+              Gerenciar Usuários
+            </button>
+            <button
+              onClick={() => setAbaAtual("logs")}
+              className={`font-semibold pb-2 ${abaAtual === "logs" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-500"}`}
+            >
+              Logs do Sistema
+            </button>
+          </div>
+        )}
+
+      {abaAtual === "usuarios" && <UsuariosAdmin />}
+      {abaAtual === "logs" && <LogsAuditoria />}
+
+      {abaAtual === "boias" && (
+        <>
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 space-y-4">
         <h2 className="font-bold text-lg text-blue-900">
           Guia de integração e cadastro
         </h2>
@@ -832,18 +858,38 @@ Payload JSON:
                   </button>
 
                   <button
-                    onClick={() => clearDataByBoia(boia.id)}
+                    onClick={async () => {
+                      const confirmar = confirm("Deseja apagar todos os dados desta boia?");
+
+                      if (!confirmar) return;
+
+                      const resposta = await fetch(`/api/leituras/${boia.id}`, {
+                        method: "DELETE",
+                        headers: {
+                          Authorization: `Bearer ${obterToken()}`,
+                        },
+                      });
+
+                      if (!resposta.ok) {
+                        alert("Erro ao apagar dados no backend.");
+                        return;
+                      }
+
+                      clearDataByBoia(boia.id);
+                    }}
                     className="bg-orange-500 text-white px-3 py-2 rounded-lg"
                   >
                     Limpar dados
                   </button>
 
-                  <button
-                    onClick={() => excluirBoia(boia.id)}
-                    className="bg-red-600 text-white px-3 py-2 rounded-lg"
-                  >
-                    Excluir
-                  </button>
+                  {isAdmin && (
+                    <button
+                      onClick={() => excluirBoia(boia.id)}
+                      className="bg-red-600 text-white px-3 py-2 rounded-lg"
+                    >
+                      Excluir
+                    </button>
+                  )}
                 </div>
               </div>
             );
@@ -884,6 +930,8 @@ Payload JSON:
             })}
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }

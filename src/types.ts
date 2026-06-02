@@ -76,6 +76,10 @@ export interface EnvironmentalData {
 
   timestamp: string;
 
+  lat?: number;
+  lon?: number;
+  alt?: number;
+
   tempAgua: number;
   phAgua: number;
   turbidez: number;
