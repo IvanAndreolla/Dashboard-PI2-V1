@@ -28,6 +28,9 @@ model Boia {
 
   lora          Boolean   @default(false)
 
+  alertaAtivo   Boolean   @default(false)
+  alertaTipo    String?   // "critico" ou "alerta"
+
   sensores      Json?
   comunicacao   Json?
 

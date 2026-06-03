@@ -10,7 +10,6 @@ import {
   SensorConfig,
   SensoresBoia,
 } from "../types";
-
 interface Props {
   boias: BoiaConfig[];
   setBoias: (boias: BoiaConfig[]) => void;
@@ -18,6 +17,7 @@ interface Props {
   addData: (data: EnvironmentalData[]) => void;
   clearDataByBoia: (boiaId: string) => void;
   onLogout: () => void;
+  theme?: "light" | "dark";
 }
 
 const API_URL = "/api";
@@ -129,6 +129,8 @@ function criarBoiaVazia(): BoiaConfig {
     gpsIntegrado: false,
     habilitada: true,
     status: "offline",
+    alertaAtivo: false,
+    alertaTipo: undefined,
     comunicacao: {
       mqtt: false,
       mqttTopico: "",
@@ -161,6 +163,8 @@ function normalizarBoiaResposta(boia: any): BoiaConfig {
     gpsIntegrado: boia.gpsIntegrado ?? false,
     habilitada: boia.habilitada ?? true,
     status: boia.status || "offline",
+    alertaAtivo: boia.alertaAtivo ?? false,
+    alertaTipo: boia.alertaTipo || null,
     comunicacao: boia.comunicacao || {
       mqtt: boia.mqtt ?? false,
       mqttTopico: boia.mqttTopico || "",
@@ -177,6 +181,7 @@ export function Admin({
   addData,
   clearDataByBoia,
   onLogout,
+  theme
 }: Props) {
   const [form, setForm] = useState<BoiaConfig>(criarBoiaVazia());
   const [editandoId, setEditandoId] = useState<string | null>(null);
@@ -401,6 +406,27 @@ export function Admin({
     }
   };
 
+  const limparAlerta = async (id: string) => {
+    try {
+      const resposta = await fetch(`${API_URL}/boias/${id}/acknowledge`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${obterToken()}`,
+        },
+      });
+
+      if (!resposta.ok) {
+        throw new Error("Erro ao limpar alerta");
+      }
+
+      const boiaAtualizada = normalizarBoiaResposta(await resposta.json());
+      setBoias(boias.map(b => b.id === id ? boiaAtualizada : b));
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao limpar alerta no servidor.");
+    }
+  };
+
   const usuarioLogado = JSON.parse(
     localStorage.getItem("hydra_usuario") || "{}"
   );
@@ -408,46 +434,42 @@ export function Admin({
   const isAdmin = usuarioLogado.role === "ADMIN";
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+    <div className="p-8 lg:p-12 space-y-12 bg-slate-50 dark:bg-black min-h-screen transition-colors duration-500">
+      <div className="flex flex-wrap items-center justify-between gap-6 border-b border-slate-200 dark:border-gold-500/20 pb-8">
         <div>
-          <h1 className="text-2xl font-bold">Administração</h1>
-          <p className="text-gray-500">
-            Cadastro de boias, sensores, comunicação, localização, imagens e envio de dados.
+          <h1 className="text-4xl font-black text-slate-900 dark:text-gold-500 tracking-tight uppercase">Administração</h1>
+          <p className="text-slate-500 dark:text-gold-500/50 font-medium">
+            Gestão estratégica de estações, parâmetros e infraestrutura de dados.
           </p>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-4">
           <button
             onClick={onLogout}
-            className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition"
+            className="bg-red-600 dark:bg-red-900/40 text-white dark:text-red-400 px-8 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:scale-105 transition-all shadow-lg"
           >
-            Sair
+            Encerrar Sessão
           </button>
         </div>
       </div>
 
       {localStorage.getItem("hydra_usuario") &&
         JSON.parse(localStorage.getItem("hydra_usuario") || "{}").role === "ADMIN" && (
-          <div className="flex gap-4 border-b pb-4 mb-6">
-            <button
-              onClick={() => setAbaAtual("boias")}
-              className={`font-semibold pb-2 ${abaAtual === "boias" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-500"}`}
-            >
-              Gerenciar Boias
-            </button>
-            <button
-              onClick={() => setAbaAtual("usuarios")}
-              className={`font-semibold pb-2 ${abaAtual === "usuarios" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-500"}`}
-            >
-              Gerenciar Usuários
-            </button>
-            <button
-              onClick={() => setAbaAtual("logs")}
-              className={`font-semibold pb-2 ${abaAtual === "logs" ? "border-b-2 border-blue-600 text-blue-600" : "text-gray-500"}`}
-            >
-              Logs do Sistema
-            </button>
+          <div className="flex gap-10 border-b border-slate-100 dark:border-gold-500/10 pb-4 mb-6">
+            {[
+              { id: "boias", label: "Estações" },
+              { id: "usuarios", label: "Usuários" },
+              { id: "logs", label: "Auditoria" }
+            ].map((aba) => (
+              <button
+                key={aba.id}
+                onClick={() => setAbaAtual(aba.id as any)}
+                className={`font-black uppercase text-[10px] tracking-[0.2em] pb-4 transition-all relative ${abaAtual === aba.id ? "text-blue-600 dark:text-gold-500" : "text-slate-400 dark:text-gold-500/30"}`}
+              >
+                {aba.label}
+                {abaAtual === aba.id && <span className="absolute bottom-0 left-0 w-full h-1 bg-blue-600 dark:bg-gold-500 rounded-full"></span>}
+              </button>
+            ))}
           </div>
         )}
 
@@ -456,46 +478,39 @@ export function Admin({
 
       {abaAtual === "boias" && (
         <>
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 space-y-4">
-        <h2 className="font-bold text-lg text-blue-900">
-          Guia de integração e cadastro
+          <div className="bg-blue-50 dark:bg-gold-500/5 border border-blue-200 dark:border-gold-500/20 rounded-[2.5rem] p-10 space-y-8 shadow-sm">
+        <h2 className="font-black text-xl text-blue-900 dark:text-gold-500 uppercase tracking-tight">
+          Guia de Integração Hydra
         </h2>
 
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 text-sm text-blue-950">
-          <div className="bg-white rounded-lg p-4">
-            <h3 className="font-bold mb-2">1. Como cadastrar uma boia</h3>
-            <p>
-              Informe nome, instituição, responsável, local, latitude, longitude,
-              imagem e os sensores instalados. Se a boia não tiver GPS integrado,
-              mantenha a posição fixa configurada manualmente.
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 text-sm">
+          <div className="bg-white dark:bg-black rounded-3xl p-6 border border-blue-100 dark:border-gold-500/10">
+            <h3 className="font-black text-blue-900 dark:text-gold-400 uppercase text-xs mb-3 tracking-widest">1. Cadastro da Estação</h3>
+            <p className="text-slate-600 dark:text-gold-500/60 leading-relaxed">
+              Informe os dados institucionais, geolocalização e defina se a estação enviará coordenadas via GPS integrado ou se manterá posição estática.
             </p>
           </div>
 
-          <div className="bg-white rounded-lg p-4">
-            <h3 className="font-bold mb-2">2. Sensores</h3>
-            <p>
-              Habilite apenas os sensores realmente existentes na boia. Os gráficos,
-              alertas, histórico e visão pública usarão somente os sensores ativos.
+          <div className="bg-white dark:bg-black rounded-3xl p-6 border border-blue-100 dark:border-gold-500/10">
+            <h3 className="font-black text-blue-900 dark:text-gold-400 uppercase text-xs mb-3 tracking-widest">2. Matriz de Sensores</h3>
+            <p className="text-slate-600 dark:text-gold-500/60 leading-relaxed">
+              Habilite apenas os sensores físicos presentes na boia. A plataforma abstrai a tecnologia de transmissão, focando na normalização dos dados.
             </p>
           </div>
 
-          <div className="bg-white rounded-lg p-4">
-            <h3 className="font-bold mb-2">3. Formato CSV esperado</h3>
-            <pre className="bg-gray-900 text-green-300 p-3 rounded-lg overflow-auto text-xs mt-2">
-              {`timestamp;tempAr;umidAr;pressao;indiceUV;chuvaAcum;ventoVel;ventoDir;tempAgua;phAgua;condutivEC;turbidez
-2026-05-01 10:00;25.3;70;1012;5;0;12;180;22.1;7.2;980;12`}
+          <div className="bg-white dark:bg-black rounded-3xl p-6 border border-blue-100 dark:border-gold-500/10">
+            <h3 className="font-black text-blue-900 dark:text-gold-400 uppercase text-xs mb-3 tracking-widest">3. Formato CSV</h3>
+            <pre className="bg-slate-900 dark:bg-black text-green-400 dark:text-gold-500 p-5 rounded-2xl border border-slate-800 dark:border-gold-500/20 overflow-auto text-xs mt-3">
+              {`timestamp;tempAr;umidAr;pressao;...
+2026-05-01 10:00;25.3;70;1012;...`}
             </pre>
           </div>
 
-          <div className="bg-white rounded-lg p-4">
-            <h3 className="font-bold mb-2">4. Mensagem MQTT sugerida</h3>
-            <pre className="bg-gray-900 text-green-300 p-3 rounded-lg overflow-auto text-xs mt-2">
-              {`Tópico:
-Hydra/ifsc-baia-sul
-
-Payload JSON:
-{
-  "timestamp": "2026-05-01 10:00",
+          <div className="bg-white dark:bg-black rounded-3xl p-6 border border-blue-100 dark:border-gold-500/10">
+            <h3 className="font-black text-blue-900 dark:text-gold-400 uppercase text-xs mb-3 tracking-widest">4. Payload MQTT</h3>
+            <pre className="bg-slate-900 dark:bg-black text-green-400 dark:text-gold-500 p-5 rounded-2xl border border-slate-800 dark:border-gold-500/20 overflow-auto text-xs mt-3">
+              {`{
+  "timestamp": "2026-06-02 16:25",
   "lat": -27.593708,
   "lon": -48.542835,
   "alt": 16.6,
@@ -514,102 +529,96 @@ Payload JSON:
             </pre>
           </div>
         </div>
-
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm text-yellow-900">
-          <strong>Observação:</strong> se um sensor não existir em determinada boia,
-          ele pode ficar desabilitado no cadastro. O CSV pode conter colunas extras,
-          mas o sistema só exibirá os sensores ativos daquela boia.
-        </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-md p-6 space-y-6">
+      <div className="bg-white dark:bg-black rounded-[3rem] shadow-xl dark:shadow-gold-500/5 border border-slate-100 dark:border-gold-500/20 p-10 space-y-10">
         <div>
-          <h2 className="font-bold text-lg">
-            {editandoId ? "Editar boia" : "Cadastrar nova boia"}
+          <h2 className="font-black text-2xl text-slate-900 dark:text-gold-500 uppercase tracking-tight">
+            {editandoId ? "Editar Estação" : "Cadastrar Nova Estação"}
           </h2>
-          <p className="text-sm text-gray-500">
-            Configure nome, instituição, posição, comunicação, imagem e sensores.
+          <p className="text-sm text-slate-400 dark:text-gold-500/50 mt-1">
+            Configuração técnica de hardware, comunicação e limites operacionais.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          <div className="xl:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">Nome</label>
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-12">
+          <div className="xl:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="space-y-1">
+              <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-gold-500/50">Nome da Boia</label>
               <input
                 value={form.nome}
                 onChange={(e) => atualizarCampo("nome", e.target.value)}
-                className="w-full border rounded-lg px-3 py-2"
-                placeholder="Boia IFSC Baía Sul"
+                className="w-full bg-slate-50 dark:bg-black border border-slate-200 dark:border-gold-500/20 rounded-xl px-4 py-3 text-slate-700 dark:text-gold-500 focus:ring-2 focus:ring-blue-500 dark:focus:ring-gold-500 outline-none transition-all"
+                placeholder="Ex: Hydra-01 Florianópolis"
               />
             </div>
 
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">Instituição</label>
+            <div className="space-y-1">
+              <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-gold-500/50">Instituição</label>
               <input
                 value={form.instituicao}
                 onChange={(e) => atualizarCampo("instituicao", e.target.value)}
-                className="w-full border rounded-lg px-3 py-2"
-                placeholder="IFSC, UFSC..."
+                className="w-full bg-slate-50 dark:bg-black border border-slate-200 dark:border-gold-500/20 rounded-xl px-4 py-3 text-slate-700 dark:text-gold-500 focus:ring-2 focus:ring-blue-500 dark:focus:ring-gold-500 outline-none transition-all"
+                placeholder="IFSC, UFSC, etc"
               />
             </div>
 
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">Responsável</label>
+            <div className="space-y-1">
+              <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-gold-500/50">Responsável</label>
               <input
                 value={form.responsavel || ""}
                 onChange={(e) => atualizarCampo("responsavel", e.target.value)}
-                className="w-full border rounded-lg px-3 py-2"
-                placeholder="Equipe, laboratório..."
+                className="w-full bg-slate-50 dark:bg-black border border-slate-200 dark:border-gold-500/20 rounded-xl px-4 py-3 text-slate-700 dark:text-gold-500 focus:ring-2 focus:ring-blue-500 dark:focus:ring-gold-500 outline-none transition-all"
+                placeholder="Equipe de Engenharia"
               />
             </div>
 
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">Local</label>
+            <div className="space-y-1">
+              <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-gold-500/50">Local de Instalação</label>
               <input
                 value={form.local}
                 onChange={(e) => atualizarCampo("local", e.target.value)}
-                className="w-full border rounded-lg px-3 py-2"
-                placeholder="Baía Sul, Lagoa do Peri..."
+                className="w-full bg-slate-50 dark:bg-black border border-slate-200 dark:border-gold-500/20 rounded-xl px-4 py-3 text-slate-700 dark:text-gold-500 focus:ring-2 focus:ring-blue-500 dark:focus:ring-gold-500 outline-none transition-all"
+                placeholder="Baía Sul, Lagoa..."
               />
             </div>
 
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">Latitude</label>
+            <div className="space-y-1">
+              <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-gold-500/50">Latitude</label>
               <input
                 type="number"
                 step="any"
                 value={form.latitude}
                 onChange={(e) => atualizarCampo("latitude", Number(e.target.value))}
-                className="w-full border rounded-lg px-3 py-2"
+                className="w-full bg-slate-50 dark:bg-black border border-slate-200 dark:border-gold-500/20 rounded-xl px-4 py-3 text-slate-700 dark:text-gold-500 focus:ring-2 focus:ring-blue-500 dark:focus:ring-gold-500 outline-none transition-all"
               />
             </div>
 
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">Longitude</label>
+            <div className="space-y-1">
+              <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-gold-500/50">Longitude</label>
               <input
                 type="number"
                 step="any"
                 value={form.longitude}
                 onChange={(e) => atualizarCampo("longitude", Number(e.target.value))}
-                className="w-full border rounded-lg px-3 py-2"
+                className="w-full bg-slate-50 dark:bg-black border border-slate-200 dark:border-gold-500/20 rounded-xl px-4 py-3 text-slate-700 dark:text-gold-500 focus:ring-2 focus:ring-blue-500 dark:focus:ring-gold-500 outline-none transition-all"
               />
             </div>
 
-            <div className="md:col-span-3">
-              <label className="block text-sm text-gray-600 mb-1">Descrição</label>
+            <div className="md:col-span-3 space-y-1">
+              <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-gold-500/50">Descrição Detalhada</label>
               <textarea
                 value={form.descricao}
                 onChange={(e) => atualizarCampo("descricao", e.target.value)}
-                className="w-full border rounded-lg px-3 py-2"
+                className="w-full bg-slate-50 dark:bg-black border border-slate-200 dark:border-gold-500/20 rounded-2xl px-4 py-3 text-slate-700 dark:text-gold-500 focus:ring-2 focus:ring-blue-500 dark:focus:ring-gold-500 outline-none transition-all"
                 rows={4}
-                placeholder="Descrição da boia, finalidade e contexto de uso..."
+                placeholder="Finalidade científica e contexto operacional..."
               />
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm text-gray-600 mb-2">Imagem da boia</label>
+          <div className="bg-slate-50 dark:bg-gold-500/5 border border-slate-100 dark:border-gold-500/10 rounded-[2.5rem] p-8">
+            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-gold-500/50 mb-6">Assinatura Visual</label>
             <ImageSelector
               value={form.imagem}
               onChange={(novaImagem) => atualizarCampo("imagem", novaImagem)}
@@ -617,98 +626,89 @@ Payload JSON:
           </div>
         </div>
 
-        <div className="border rounded-xl p-4 space-y-4">
-          <h3 className="font-bold">Comunicação</h3>
+        <div className="bg-slate-50 dark:bg-gold-500/5 border border-slate-200 dark:border-gold-500/20 rounded-[2.5rem] p-8 space-y-6">
+          <h3 className="font-black uppercase text-xs tracking-widest text-slate-800 dark:text-gold-500">Matriz de Comunicação</h3>
 
-          <div className="flex flex-wrap gap-4">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={form.comunicacao.mqtt}
-                onChange={(e) => atualizarComunicacao("mqtt", e.target.checked)}
-              />
-              MQTT
-            </label>
-
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={form.comunicacao.lora || false}
-                onChange={(e) => atualizarComunicacao("lora", e.target.checked)}
-              />
-              LoRa
-            </label>
-
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={form.gpsIntegrado}
-                onChange={(e) => atualizarCampo("gpsIntegrado", e.target.checked)}
-              />
-              GPS integrado
-            </label>
+          <div className="flex flex-wrap gap-8">
+            {[
+              { id: "mqtt", label: "Procolo MQTT", checked: form.comunicacao.mqtt },
+              { id: "lora", label: "Rádio LoRa", checked: form.comunicacao.lora },
+              { id: "gps", label: "GPS Integrado", checked: form.gpsIntegrado },
+              { id: "sticky", label: "Alertas Persistentes (Sticky)", checked: form.alertaAtivo }
+            ].map((com) => (
+              <label key={com.id} className="flex items-center gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={com.checked as any}
+                  onChange={(e) => {
+                    if (com.id === "gps") atualizarCampo("gpsIntegrado", e.target.checked);
+                    else if (com.id === "sticky") atualizarCampo("alertaAtivo", e.target.checked);
+                    else atualizarComunicacao(com.id as any, e.target.checked);
+                  }}
+                  className="w-5 h-5 rounded-lg border-slate-300 dark:border-gold-500/30 text-blue-600 dark:text-gold-500 focus:ring-blue-500 dark:focus:ring-gold-500 bg-white dark:bg-black"
+                />
+                <span className="text-xs font-bold text-slate-600 dark:text-gold-500/80 group-hover:text-slate-900 dark:group-hover:text-gold-400 transition-colors">{com.label}</span>
+              </label>
+            ))}
           </div>
 
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">Tópico MQTT</label>
+          <div className="pt-4">
+            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-gold-500/50 mb-2">Tópico MQTT (Stream de Dados)</label>
             <input
               value={form.comunicacao.mqttTopico || ""}
               onChange={(e) => atualizarComunicacao("mqttTopico", e.target.value)}
-              className="w-full border rounded-lg px-3 py-2"
+              className="w-full bg-white dark:bg-black border border-slate-200 dark:border-gold-500/20 rounded-xl px-4 py-3 text-slate-700 dark:text-gold-500 outline-none focus:border-blue-500 dark:focus:border-gold-500 transition-all"
               placeholder="Hydra/ifsc-baia-sul"
             />
           </div>
         </div>
 
-        <div className="border rounded-xl p-4 space-y-4">
-          <h3 className="font-bold">Sensores e limites</h3>
+        <div className="space-y-6">
+          <h3 className="font-black uppercase text-xs tracking-widest text-slate-800 dark:text-gold-500">Parâmetros de Sensores e Limites Críticos</h3>
 
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             {listaSensores.map(({ chave, titulo }) => {
               const sensorAtual = form.sensores[chave] || sensoresPadrao[chave];
 
               return (
-                <div key={chave} className="border rounded-lg p-4 space-y-3">
-                  <label className="flex items-center gap-2 font-semibold">
+                <div key={chave} className="bg-slate-50 dark:bg-gold-500/5 border border-slate-200 dark:border-gold-500/20 rounded-3xl p-6 space-y-6 hover:shadow-xl dark:hover:shadow-[0_0_30px_rgba(212,175,55,0.1)] transition-all">
+                  <label className="flex items-center gap-3 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={sensorAtual?.ativo || false}
                       onChange={(e) =>
                         atualizarSensor(chave, "ativo", e.target.checked)
                       }
+                      className="w-5 h-5 rounded-lg border-slate-300 dark:border-gold-500/30 text-blue-600 dark:text-gold-500 focus:ring-blue-500 dark:focus:ring-gold-500 bg-white dark:bg-black"
                     />
-                    {titulo}
+                    <span className="font-black uppercase text-[10px] tracking-widest text-slate-800 dark:text-gold-500">{titulo}</span>
                   </label>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">
-                        Nome exibido
-                      </label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="space-y-1">
+                      <label className="block text-[8px] font-black uppercase tracking-widest text-slate-400 dark:text-gold-500/40">Nome Exibido</label>
                       <input
                         value={sensorAtual?.nome || ""}
                         onChange={(e) =>
                           atualizarSensor(chave, "nome", e.target.value)
                         }
-                        className="w-full border rounded-lg px-3 py-2 text-sm"
+                        className="w-full bg-white dark:bg-black border border-slate-200 dark:border-gold-500/20 rounded-lg px-3 py-2 text-xs text-slate-700 dark:text-gold-500 outline-none"
                       />
                     </div>
 
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Unidade</label>
+                    <div className="space-y-1">
+                      <label className="block text-[8px] font-black uppercase tracking-widest text-slate-400 dark:text-gold-500/40">Unidade</label>
                       <input
                         value={sensorAtual?.unidade || ""}
                         onChange={(e) =>
                           atualizarSensor(chave, "unidade", e.target.value)
                         }
-                        className="w-full border rounded-lg px-3 py-2 text-sm"
+                        className="w-full bg-white dark:bg-black border border-slate-200 dark:border-gold-500/20 rounded-lg px-3 py-2 text-xs text-slate-700 dark:text-gold-500 outline-none"
                       />
                     </div>
 
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">
-                        Mín. alerta
-                      </label>
+                    <div className="space-y-1">
+                      <label className="block text-[8px] font-black uppercase tracking-widest text-slate-400 dark:text-gold-500/40">Mín. Alerta</label>
                       <input
                         type="number"
                         step="any"
@@ -720,14 +720,12 @@ Payload JSON:
                             numeroOuUndefined(e.target.value)
                           )
                         }
-                        className="w-full border rounded-lg px-3 py-2 text-sm"
+                        className="w-full bg-white dark:bg-black border border-slate-200 dark:border-gold-500/20 rounded-lg px-3 py-2 text-xs text-slate-700 dark:text-gold-500 outline-none"
                       />
                     </div>
 
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">
-                        Máx. alerta
-                      </label>
+                    <div className="space-y-1">
+                      <label className="block text-[8px] font-black uppercase tracking-widest text-slate-400 dark:text-gold-500/40">Máx. Alerta</label>
                       <input
                         type="number"
                         step="any"
@@ -739,14 +737,12 @@ Payload JSON:
                             numeroOuUndefined(e.target.value)
                           )
                         }
-                        className="w-full border rounded-lg px-3 py-2 text-sm"
+                        className="w-full bg-white dark:bg-black border border-slate-200 dark:border-gold-500/20 rounded-lg px-3 py-2 text-xs text-slate-700 dark:text-gold-500 outline-none"
                       />
                     </div>
 
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">
-                        Mín. crítico
-                      </label>
+                    <div className="space-y-1">
+                      <label className="block text-[8px] font-black uppercase tracking-widest text-slate-400 dark:text-gold-500/40">Mín. Crítico</label>
                       <input
                         type="number"
                         step="any"
@@ -758,14 +754,12 @@ Payload JSON:
                             numeroOuUndefined(e.target.value)
                           )
                         }
-                        className="w-full border rounded-lg px-3 py-2 text-sm"
+                        className="w-full bg-white dark:bg-black border border-slate-200 dark:border-gold-500/20 rounded-lg px-3 py-2 text-xs text-slate-700 dark:text-gold-500 outline-none"
                       />
                     </div>
 
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">
-                        Máx. crítico
-                      </label>
+                    <div className="space-y-1">
+                      <label className="block text-[8px] font-black uppercase tracking-widest text-slate-400 dark:text-gold-500/40">Máx. Crítico</label>
                       <input
                         type="number"
                         step="any"
@@ -777,7 +771,7 @@ Payload JSON:
                             numeroOuUndefined(e.target.value)
                           )
                         }
-                        className="w-full border rounded-lg px-3 py-2 text-sm"
+                        className="w-full bg-white dark:bg-black border border-slate-200 dark:border-gold-500/20 rounded-lg px-3 py-2 text-xs text-slate-700 dark:text-gold-500 outline-none"
                       />
                     </div>
                   </div>
@@ -787,72 +781,79 @@ Payload JSON:
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-4 pt-8">
           <button
             onClick={salvarBoia}
-            className="bg-blue-700 text-white px-5 py-2 rounded-lg hover:bg-blue-800 transition"
+            className="bg-blue-600 dark:bg-gold-500 text-white dark:text-black px-10 py-4 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] hover:scale-105 transition-all shadow-xl dark:shadow-gold-500/10"
           >
-            {editandoId ? "Salvar alterações" : "Cadastrar boia"}
+            {editandoId ? "Atualizar Registro" : "Publicar Estação"}
           </button>
 
           <button
             onClick={limparFormulario}
-            className="bg-gray-200 text-gray-800 px-5 py-2 rounded-lg hover:bg-gray-300 transition"
+            className="bg-slate-200 dark:bg-gold-500/5 text-slate-600 dark:text-gold-500 px-10 py-4 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] border border-slate-300 dark:border-gold-500/20 hover:bg-slate-300 dark:hover:bg-gold-500/10 transition-all"
           >
-            Limpar formulário
+            Resetar Formulário
           </button>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-md p-6">
-        <h2 className="font-bold text-lg mb-4">Boias cadastradas</h2>
+      <div className="bg-white dark:bg-black rounded-[3rem] shadow-xl dark:shadow-gold-500/5 border border-slate-100 dark:border-gold-500/20 p-10">
+        <h2 className="font-black text-2xl text-slate-900 dark:text-gold-500 mb-8 uppercase tracking-tight">Frota de Estações Ativas</h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
           {boias.map((boia) => {
             const dadosBoia = getDadosDaBoia(data, boia.id);
             const ultima = dadosBoia[dadosBoia.length - 1];
 
             return (
-              <div key={boia.id} className="border rounded-xl p-4 space-y-4">
-                <div className="flex gap-4 items-center">
-                  <img
-                    src={boia.imagem}
-                    alt={boia.nome}
-                    className="w-20 h-20 object-contain bg-black rounded-lg"
-                  />
+              <div key={boia.id} className="bg-slate-50 dark:bg-gold-500/5 border border-slate-200 dark:border-gold-500/20 rounded-[2.5rem] p-8 space-y-6 hover:shadow-xl dark:hover:shadow-[0_0_30px_rgba(212,175,55,0.1)] transition-all group">
+                <div className="flex gap-6 items-center">
+                  <div className="w-24 h-24 bg-white dark:bg-gold-500/10 rounded-3xl p-4 shadow-inner border border-slate-100 dark:border-gold-500/20 group-hover:scale-105 transition-transform">
+                    <img
+                      src={boia.imagem}
+                      alt={boia.nome}
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
 
                   <div className="flex-1">
-                    <h3 className="font-bold">{boia.nome}</h3>
+                    <h3 className="font-black text-slate-900 dark:text-gold-500 uppercase text-sm tracking-tight">{boia.nome}</h3>
 
-                    <p className="text-sm text-gray-500">
-                      {boia.instituicao} — {boia.local}
+                    <p className="text-[10px] font-bold text-slate-400 dark:text-gold-500/40 uppercase tracking-widest mt-1">
+                      {boia.instituicao}
                     </p>
 
-                    <p className="text-xs text-gray-500">
-                      Registros: {dadosBoia.length}
-                    </p>
-
-                    <p className="text-xs text-gray-500">
-                      Última leitura: {ultima ? ultima.timestamp : "sem dados"}
+                    <p className="text-[10px] font-black text-blue-600 dark:text-gold-600 uppercase tracking-widest mt-3">
+                      Lote: {dadosBoia.length} registros
                     </p>
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
+                <div className="pt-4 border-t border-slate-200 dark:border-gold-500/10 flex flex-wrap gap-3">
+                  {boia.alertaAtivo && (
+                    <button
+                      onClick={() => limparAlerta(boia.id)}
+                      className="bg-sky-500 text-white dark:text-black dark:bg-gold-300 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-transform shadow-lg"
+                    >
+                      Acknowledge
+                    </button>
+                  )}
+
                   <button
                     onClick={() => alternarBoia(boia.id)}
                     className={
                       boia.habilitada
-                        ? "bg-green-600 text-white px-3 py-2 rounded-lg"
-                        : "bg-gray-300 text-gray-700 px-3 py-2 rounded-lg"
+                        ? "bg-emerald-500 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest"
+                        : "bg-slate-300 dark:bg-gold-500/5 text-slate-600 dark:text-gold-500/30 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest"
                     }
                   >
-                    {boia.habilitada ? "ON" : "OFF"}
+                    {boia.habilitada ? "ATIVO" : "OFF"}
                   </button>
 
                   <button
                     onClick={() => editarBoia(boia)}
-                    className="bg-blue-600 text-white px-3 py-2 rounded-lg"
+                    className="bg-slate-900 dark:bg-gold-500 text-white dark:text-black px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-transform"
                   >
                     Editar
                   </button>
@@ -877,17 +878,17 @@ Payload JSON:
 
                       clearDataByBoia(boia.id);
                     }}
-                    className="bg-orange-500 text-white px-3 py-2 rounded-lg"
+                    className="bg-amber-500 dark:bg-amber-900/30 text-white dark:text-amber-500 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest"
                   >
-                    Limpar dados
+                    Wipe
                   </button>
 
                   {isAdmin && (
                     <button
                       onClick={() => excluirBoia(boia.id)}
-                      className="bg-red-600 text-white px-3 py-2 rounded-lg"
+                      className="bg-red-600 dark:bg-red-900/30 text-white dark:text-red-500 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest"
                     >
-                      Excluir
+                      Delete
                     </button>
                   )}
                 </div>
@@ -897,29 +898,30 @@ Payload JSON:
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-md p-6">
-        <h2 className="font-bold text-lg mb-4">Upload de dados por boia</h2>
+      <div className="bg-white dark:bg-black rounded-[3rem] shadow-xl dark:shadow-gold-500/5 border border-slate-100 dark:border-gold-500/20 p-10">
+        <h2 className="font-black text-2xl text-slate-900 dark:text-gold-500 mb-8 uppercase tracking-tight">Ingestão de Dados em Massa (CSV)</h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
           {boias
             .filter((boia) => boia.habilitada)
             .map((boia) => {
               const dadosBoia = getDadosDaBoia(data, boia.id);
 
               return (
-                <div key={boia.id} className="border rounded-xl p-4 space-y-4">
-                  <div className="flex items-center gap-3">
-                    <img
-                      src={boia.imagem}
-                      alt={boia.nome}
-                      className="w-16 h-16 object-contain bg-black rounded-lg"
-                    />
+                <div key={boia.id} className="bg-slate-50 dark:bg-gold-500/5 border border-slate-200 dark:border-gold-500/20 rounded-[2.5rem] p-8 space-y-6">
+                  <div className="flex items-center gap-5">
+                    <div className="w-16 h-16 bg-white dark:bg-gold-500/10 rounded-2xl p-3 shadow-inner">
+                        <img
+                          src={boia.imagem}
+                          alt={boia.nome}
+                          className="w-full h-full object-contain"
+                        />
+                    </div>
 
                     <div>
-                      <h3 className="font-bold">{boia.nome}</h3>
-
-                      <p className="text-sm text-gray-500">
-                        {dadosBoia.length} registros carregados
+                      <h3 className="font-black text-slate-900 dark:text-gold-500 uppercase text-xs tracking-widest">{boia.nome}</h3>
+                      <p className="text-[10px] font-bold text-slate-400 dark:text-gold-500/40 uppercase tracking-widest mt-1">
+                        {dadosBoia.length} entradas
                       </p>
                     </div>
                   </div>

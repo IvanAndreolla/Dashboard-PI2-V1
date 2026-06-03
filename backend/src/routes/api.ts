@@ -55,6 +55,9 @@ function converterBoia(boia: any) {
     mqttTopico: boia.mqttTopico,
     lora: boia.lora,
 
+    alertaAtivo: boia.alertaAtivo,
+    alertaTipo: boia.alertaTipo,
+
     sensores: boia.sensores,
     comunicacao: boia.comunicacao,
 
@@ -66,6 +69,37 @@ function converterBoia(boia: any) {
 // =======================
 // BOIAS
 // =======================
+
+apiRoutes.post("/boias/:id/acknowledge", authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const boia = await prisma.boia.update({
+      where: { id },
+      data: {
+        alertaAtivo: false,
+        alertaTipo: null,
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        usuarioId: (req as any).usuarioId || "SISTEMA",
+        acao: "LIMPOU_ALERTA",
+        ip: req.ip,
+        detalhes: { boiaId: boia.id, nome: boia.nome },
+      }
+    });
+
+    const io = req.app.get("io");
+    if (io) io.emit("boia:update", converterBoia(boia));
+
+    res.json(converterBoia(boia));
+  } catch (error) {
+    console.error("Erro ao limpar alerta:", error);
+    res.status(500).json({ error: "Erro ao limpar alerta" });
+  }
+});
 
 apiRoutes.get("/boias", async (_req, res) => {
   try {
@@ -112,6 +146,9 @@ apiRoutes.post("/boias", authMiddleware, async (req, res) => {
         mqtt: comunicacao.mqtt ?? false,
         mqttTopico: comunicacao.mqttTopico || body.mqttTopico || "",
         lora: comunicacao.lora ?? false,
+
+        alertaAtivo: body.alertaAtivo ?? false,
+        alertaTipo: body.alertaTipo || null,
 
         sensores: body.sensores || {},
         comunicacao,
@@ -168,6 +205,9 @@ apiRoutes.put("/boias/:id", authMiddleware, async (req, res) => {
         mqtt: comunicacao.mqtt ?? false,
         mqttTopico: comunicacao.mqttTopico || body.mqttTopico || "",
         lora: comunicacao.lora ?? false,
+
+        alertaAtivo: body.alertaAtivo ?? false,
+        alertaTipo: body.alertaTipo || null,
 
         sensores: body.sensores || {},
         comunicacao,

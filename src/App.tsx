@@ -19,18 +19,10 @@ import {
   EnvironmentalData,
   SensorConfig,
   SensoresBoia,
-  StatusBoia,
+  Page
 } from "./types";
 
-type Page =
-  | "dashboard"
-  | "boias"
-  | "alertas"
-  | "historico"
-  | "boiaDetalhe"
-  | "admin"
-  | "mapa"
-  | "publico";
+import { calcularStatusBoia } from "./utils/alertas";
 
 function sensor(
   ativo: boolean,
@@ -53,71 +45,18 @@ function sensor(
 }
 
 const sensoresCompletos: SensoresBoia = {
+  tempAr: sensor(true, "Temperatura do ar", "°C"),
+  umidAr: sensor(true, "Umidade do ar", "%"),
+  pressao: sensor(true, "Pressão atmosférica", "hPa"),
+  indiceUV: sensor(true, "Índice UV", ""),
+  chuvaAcum: sensor(true, "Chuva acumulada", "mm"),
+  ventoVel: sensor(true, "Velocidade do vento", "km/h"),
+  ventoDir: sensor(true, "Direção do vento", "°"),
   tempAgua: sensor(true, "Temperatura da água", "°C", undefined, 30, undefined, 35),
   phAgua: sensor(true, "pH da água", "pH", 6.5, 8.5, 6.0, 9.0),
   turbidez: sensor(true, "Turbidez", "NTU", undefined, 15, undefined, 30),
   condutivEC: sensor(true, "Condutividade", "µS/cm"),
-
-  tempAr: sensor(true, "Temperatura do ar", "°C"),
-  umidAr: sensor(true, "Umidade do ar", "%"),
-  pressao: sensor(true, "Pressão atmosférica", "hPa"),
-
-  indiceUV: sensor(true, "Índice UV", ""),
-
-  chuvaAcum: sensor(true, "Chuva acumulada", "mm"),
-
-  ventoVel: sensor(true, "Velocidade do vento", "km/h"),
-  ventoDir: sensor(true, "Direção do vento", "°"),
 };
-
-function sensorAtivo(boia: BoiaConfig, chave: keyof SensoresBoia) {
-  return boia && boia.sensores && boia.sensores[chave]?.ativo === true;
-}
-
-function calcularStatusBoia(
-  leitura: EnvironmentalData | undefined,
-  boia: BoiaConfig
-): StatusBoia {
-  if (!leitura || !boia) return "offline";
-
-  try {
-    const agora = new Date();
-    const timestampLeitura = new Date(leitura.timestamp.includes('T') ? leitura.timestamp : leitura.timestamp.replace(" ", "T"));
-
-    if (isNaN(timestampLeitura.getTime())) return "offline";
-
-    const diferencaMs = agora.getTime() - timestampLeitura.getTime();
-    const diferencaMinutos = diferencaMs / 1000 / 60;
-
-    if (diferencaMinutos > 15) {
-      return "offline";
-    }
-  } catch (error) {
-    return "offline";
-  }
-
-  // Critical checks
-  if (
-    sensorAtivo(boia, "phAgua") && leitura.phAgua != null &&
-    ((boia.sensores.phAgua?.minCritico !== undefined && leitura.phAgua < boia.sensores.phAgua.minCritico) ||
-      (boia.sensores.phAgua?.maxCritico !== undefined && leitura.phAgua > boia.sensores.phAgua.maxCritico))
-  ) return "critico";
-
-  if (sensorAtivo(boia, "turbidez") && leitura.turbidez != null && boia.sensores.turbidez?.maxCritico !== undefined && leitura.turbidez > boia.sensores.turbidez.maxCritico) return "critico";
-  if (sensorAtivo(boia, "tempAgua") && leitura.tempAgua != null && boia.sensores.tempAgua?.maxCritico !== undefined && leitura.tempAgua > boia.sensores.tempAgua.maxCritico) return "critico";
-
-  // Alerta checks
-  if (
-    sensorAtivo(boia, "phAgua") && leitura.phAgua != null &&
-    ((boia.sensores.phAgua?.minAlerta !== undefined && leitura.phAgua < boia.sensores.phAgua.minAlerta) ||
-      (boia.sensores.phAgua?.maxAlerta !== undefined && leitura.phAgua > boia.sensores.phAgua.maxAlerta))
-  ) return "alerta";
-
-  if (sensorAtivo(boia, "turbidez") && leitura.turbidez != null && boia.sensores.turbidez?.maxAlerta !== undefined && leitura.turbidez > boia.sensores.turbidez.maxAlerta) return "alerta";
-  if (sensorAtivo(boia, "tempAgua") && leitura.tempAr != null && boia.sensores.tempAgua?.maxAlerta !== undefined && leitura.tempAgua > boia.sensores.tempAgua.maxAlerta) return "alerta";
-
-  return "ok";
-}
 
 function converterBoiaBackendParaFrontend(boia: any): BoiaConfig {
   const latPadrao = -27.603671 + (Math.random() - 0.5) * 0.01;
@@ -136,6 +75,10 @@ function converterBoiaBackendParaFrontend(boia: any): BoiaConfig {
     gpsIntegrado: boia.gpsIntegrado ?? false,
     habilitada: boia.habilitada ?? true,
     status: "offline",
+
+    alertaAtivo: boia.alertaAtivo ?? false,
+    alertaTipo: boia.alertaTipo || null,
+
     comunicacao: boia.comunicacao || {
       mqtt: boia.mqtt ?? false,
       mqttTopico: boia.mqttTopico || "",
@@ -151,6 +94,13 @@ function App() {
   const [boias, setBoias] = useState<BoiaConfig[]>([]);
   const [adminLogado, setAdminLogado] = useState(() => !!localStorage.getItem("hydra_token"));
   const [boiaSelecionada, setBoiaSelecionada] = useState<string>("ifsc-baia-sul");
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    return (localStorage.getItem("hydra_theme") as "light" | "dark") || "light";
+  });
+
+  useEffect(() => {
+    localStorage.setItem("hydra_theme", theme);
+  }, [theme]);
 
   useEffect(() => {
     async function loadData() {
@@ -218,20 +168,22 @@ function App() {
   const readingsAtual = data.filter(d => d.boiaId === boiaSelecionada);
 
   return (
-    <div className="flex min-h-screen bg-gray-50 font-sans">
-      <Sidebar page={page} setPage={setPage} />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {page !== "publico" && <Topbar data={data} />}
-        <main className="flex-1 overflow-y-auto">
-          {page === "dashboard" && <Dashboard data={data} boias={boiasAtualizadas} />}
-          {page === "publico" && <Publico data={data} boias={boiasAtualizadas} />}
-          {page === "boias" && <Boias boias={boiasAtualizadas} setBoiaSelecionada={setBoiaSelecionada} setPage={setPage} />}
-          {page === "boiaDetalhe" && boiaAtual && <BoiaDetalhe boia={boiaAtual} data={readingsAtual} setPage={setPage} />}
-          {page === "mapa" && <Mapa boias={boiasAtualizadas} data={data} setBoiaSelecionada={setBoiaSelecionada} setPage={setPage} />}
-          {page === "alertas" && <Alertas boias={boiasAtualizadas} data={data} />}
-          {page === "historico" && <Historico boias={boiasAtualizadas} data={data} />}
-          {page === "admin" && (!adminLogado ? <LoginAdmin onLogin={() => setAdminLogado(true)} /> : <Admin boias={boiasAtualizadas} setBoias={setBoias} data={data} addData={d => setData(p => [...p, ...d])} clearDataByBoia={id => setData(p => p.filter(d => d.boiaId !== id))} onLogout={logoutAdmin} />)}
-        </main>
+    <div className={theme === "dark" ? "dark" : ""}>
+      <div className="flex min-h-screen bg-slate-50 dark:bg-black font-sans transition-colors duration-500">
+        <Sidebar page={page} setPage={setPage} theme={theme} setTheme={setTheme} />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {page !== "publico" && <Topbar data={data} theme={theme} />}
+          <main className="flex-1 overflow-y-auto">
+            {page === "dashboard" && <Dashboard data={data} boias={boiasAtualizadas} theme={theme} setPage={setPage} />}
+            {page === "publico" && <Publico data={data} boias={boiasAtualizadas} theme={theme} />}
+            {page === "boias" && <Boias boias={boiasAtualizadas} setBoiaSelecionada={setBoiaSelecionada} setPage={setPage} theme={theme} />}
+            {page === "boiaDetalhe" && boiaAtual && <BoiaDetalhe boia={boiaAtual} data={readingsAtual} setPage={setPage} theme={theme} />}
+            {page === "mapa" && <Mapa boias={boiasAtualizadas} data={data} setBoiaSelecionada={setBoiaSelecionada} setPage={setPage} theme={theme} />}
+            {page === "alertas" && <Alertas boias={boiasAtualizadas} data={data} theme={theme} />}
+            {page === "historico" && <Historico boias={boiasAtualizadas} data={data} theme={theme} />}
+            {page === "admin" && (!adminLogado ? <LoginAdmin onLogin={() => setAdminLogado(true)} /> : <Admin boias={boiasAtualizadas} setBoias={setBoias} data={data} addData={d => setData(p => [...p, ...d])} clearDataByBoia={id => setData(p => p.filter(d => d.boiaId !== id))} onLogout={logoutAdmin} theme={theme} />)}
+          </main>
+        </div>
       </div>
     </div>
   );

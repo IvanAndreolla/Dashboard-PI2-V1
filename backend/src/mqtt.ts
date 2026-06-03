@@ -4,7 +4,17 @@ import { EnvironmentalData } from "./types";
 import { prisma } from "./prisma";
 
 function converterTimestamp(timestamp: string) {
-  return new Date(timestamp.replace(" ", "T"));
+  let ts = timestamp.replace(" ", "T");
+  
+  if (ts.length === 16) {
+    ts += ":00";
+  }
+  
+  if (!ts.includes("Z") && !ts.includes("-", 11) && !ts.includes("+", 11)) {
+    ts += "-03:00";
+  }
+  
+  return new Date(ts);
 }
 
 async function garantirBoiaExiste(boiaId: string) {
@@ -147,16 +157,56 @@ async function salvarLeitura(dado: EnvironmentalData) {
     },
   });
 
+  // LOGICA DE ALERTA PERSISTENTE (STICKY)
+  // Verificamos se algum dado novo ultrapassou os limites e travamos a boia em alerta
+  const sensoresBoia = boia.sensores as any;
+  let novoAlertaTipo: "critico" | "alerta" | null = null;
+
+  if (sensoresBoia) {
+    const keys = Object.keys(sensoresBoia);
+    for (const key of keys) {
+      const config = sensoresBoia[key];
+      const valor = (dado as any)[key];
+      
+      if (config && config.ativo && valor != null) {
+        // Críticos (prioridade)
+        if ((config.minCritico !== undefined && valor < config.minCritico) || 
+            (config.maxCritico !== undefined && valor > config.maxCritico)) {
+          novoAlertaTipo = "critico";
+          break; // Crítico tem prioridade máxima, pode parar de olhar
+        }
+        // Atenção (apenas se ainda não for crítico)
+        if (!novoAlertaTipo && 
+           ((config.minAlerta !== undefined && valor < config.minAlerta) || 
+            (config.maxAlerta !== undefined && valor > config.maxAlerta))) {
+          novoAlertaTipo = "alerta";
+        }
+      }
+    }
+  }
+
+  const boiaUpdateData: any = {};
   if (dado.lat !== undefined && dado.lon !== undefined) {
+    boiaUpdateData.latitude = dado.lat;
+    boiaUpdateData.longitude = dado.lon;
+    boiaUpdateData.altitude = dado.alt ?? null;
+  }
+
+  // Se detectou um novo problema, ou se já estava em alerta e queremos manter (Sticky)
+  // Nota: Aqui só setamos para TRUE se detectado. Se o dado for bom, NÃO setamos para FALSE 
+  // (quem seta para false é o botão Acknowledge no Admin)
+  if (novoAlertaTipo) {
+    boiaUpdateData.alertaAtivo = true;
+    // Se o novo for critico e o antigo era alerta, sobe o nível.
+    if (novoAlertaTipo === "critico" || !boia.alertaAtivo) {
+        boiaUpdateData.alertaTipo = novoAlertaTipo;
+    }
+  }
+
+  if (Object.keys(boiaUpdateData).length > 0) {
     await prisma.boia.update({
-      where: {
-        id: boia.id,
-      },
-      data: {
-        latitude: dado.lat,
-        longitude: dado.lon,
-        altitude: dado.alt ?? null,
-      },
+      where: { id: boia.id },
+      data: boiaUpdateData,
     });
   }
 

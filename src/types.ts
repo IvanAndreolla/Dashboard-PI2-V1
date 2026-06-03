@@ -66,6 +66,9 @@ export interface BoiaConfig {
 
   status: StatusBoia;
 
+  alertaAtivo?: boolean;
+  alertaTipo?: "alerta" | "critico";
+
   comunicacao: ComunicacaoBoia;
 
   sensores: SensoresBoia;

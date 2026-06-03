@@ -22,12 +22,13 @@ interface Props {
   data: EnvironmentalData[];
   setBoiaSelecionada: (id: string) => void;
   setPage: (page: Page) => void;
+  theme?: "light" | "dark";
 }
 
-function getCorStatus(status: string) {
-  if (status === "critico") return "#dc2626";
-  if (status === "alerta") return "#f59e0b";
-  if (status === "ok") return "#16a34a";
+function getCorStatus(status: string, theme?: string) {
+  if (status === "critico") return theme === "dark" ? "#916408" : "#dc2626";
+  if (status === "alerta") return theme === "dark" ? "#b8860b" : "#f59e0b";
+  if (status === "ok") return theme === "dark" ? "#d4af37" : "#16a34a";
   return "#6b7280";
 }
 
@@ -38,8 +39,8 @@ function getTextoStatus(status: string) {
   return "Offline";
 }
 
-function criarIcone(status: string) {
-  const cor = getCorStatus(status);
+function criarIcone(status: string, theme?: string) {
+  const cor = getCorStatus(status, theme);
 
   return L.divIcon({
     className: "",
@@ -49,7 +50,7 @@ function criarIcone(status: string) {
         height: 26px;
         border-radius: 999px;
         background: ${cor};
-        border: 3px solid white;
+        border: 3px solid ${theme === 'dark' ? 'black' : 'white'};
         box-shadow: 0 0 16px ${cor};
       "></div>
     `,
@@ -63,55 +64,55 @@ function getUltimaLeitura(data: EnvironmentalData[], boiaId: string) {
   return dados[dados.length - 1];
 }
 
-export function Mapa({ boias, data, setBoiaSelecionada, setPage }: Props) {
+export function Mapa({ boias, data, setBoiaSelecionada, setPage, theme }: Props) {
   const boiasAtivas = boias.filter((boia) => boia.habilitada);
 
   return (
-    <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Mapa das boias</h1>
-        <p className="text-gray-500">
-          Visualização geográfica das boias monitoradas.
+    <div className="p-8 lg:p-12 space-y-10 bg-slate-50 dark:bg-black min-h-screen transition-colors duration-500">
+      <div className="border-b border-slate-200 dark:border-gold-500/20 pb-8">
+        <h1 className="text-4xl font-black text-slate-900 dark:text-gold-500 tracking-tight uppercase">Geomonitoramento</h1>
+        <p className="text-slate-500 dark:text-gold-500/50 font-medium">
+          Mapeamento espacial das estações e telemetria georreferenciada.
         </p>
       </div>
 
-      <div className="bg-white rounded-xl shadow-md overflow-hidden relative">
-        <div className="absolute z-[500] bottom-4 left-4 bg-white/95 rounded-xl shadow-md p-4 text-sm space-y-2">
-          <h3 className="font-bold mb-2">Legenda</h3>
+      <div className="bg-white dark:bg-black rounded-[3rem] shadow-2xl dark:shadow-gold-500/5 overflow-hidden relative border border-slate-100 dark:border-gold-500/20">
+        <div className="absolute z-[500] bottom-8 left-8 bg-white/95 dark:bg-black/90 backdrop-blur-md rounded-3xl shadow-2xl p-6 text-sm space-y-4 border border-slate-200 dark:border-gold-500/30">
+          <h3 className="font-black uppercase text-[10px] tracking-widest text-slate-400 dark:text-gold-500/50">Legenda Operacional</h3>
 
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-green-600" />
-            <span>Operando</span>
+          <div className="flex items-center gap-3">
+            <span className="w-3 h-3 rounded-full bg-green-500 dark:bg-gold-500 shadow-[0_0_10px_rgba(212,175,55,0.4)]" />
+            <span className="font-bold text-slate-700 dark:text-gold-500/80">Operando</span>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-yellow-500" />
-            <span>Atenção</span>
+          <div className="flex items-center gap-3">
+            <span className="w-3 h-3 rounded-full bg-yellow-500 dark:bg-gold-600" />
+            <span className="font-bold text-slate-700 dark:text-gold-500/80">Atenção</span>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-red-600" />
-            <span>Crítico</span>
+          <div className="flex items-center gap-3">
+            <span className="w-3 h-3 rounded-full bg-red-600 dark:bg-gold-800" />
+            <span className="font-bold text-slate-700 dark:text-gold-500/80">Crítico</span>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-gray-500" />
-            <span>Offline</span>
+          <div className="flex items-center gap-3">
+            <span className="w-3 h-3 rounded-full bg-gray-500 dark:bg-gold-950" />
+            <span className="font-bold text-slate-700 dark:text-gold-500/80">Offline</span>
           </div>
         </div>
 
-        <div className="h-[620px]">
+        <div className="h-[650px]">
           <MapContainer
             center={[-27.5969, -48.4673]}
-            zoom={14}
+            zoom={13}
             scrollWheelZoom
             className="h-full w-full"
           >
             <LayersControl position="topright">
-              <LayersControl.BaseLayer checked name="Mapa">
+              <LayersControl.BaseLayer checked name="Cartográfico">
                 <TileLayer
                   attribution='&copy; OpenStreetMap contributors'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  url={theme === 'dark' ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png' : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'}
                 />
               </LayersControl.BaseLayer>
 
@@ -125,31 +126,32 @@ export function Mapa({ boias, data, setBoiaSelecionada, setPage }: Props) {
 
             {boiasAtivas.map((boia) => {
               const ultima = getUltimaLeitura(data, boia.id);
-              const corStatus = getCorStatus(boia.status);
+              const corStatus = getCorStatus(boia.status, theme);
 
-              // Use a loose equality check to catch null or undefined
               if (boia.latitude == null || boia.longitude == null) return null;
 
               return (
                 <Marker
-                  key={`${boia.id}-${boia.latitude}-${boia.longitude}`} // Changing key forces re-render if position changes
+                  key={`${boia.id}-${boia.latitude}-${boia.longitude}`}
                   position={[boia.latitude, boia.longitude]}
-                  icon={criarIcone(boia.status)}
+                  icon={criarIcone(boia.status, theme)}
                 >
                   <Popup>
-                    <div className="min-w-56 space-y-3">
-                      <div className="flex items-center gap-3">
-                        <img
-                          src={boia.imagem}
-                          alt={boia.nome}
-                          className="w-14 h-14 object-contain bg-black rounded-lg"
-                        />
+                    <div className={`min-w-64 p-2 space-y-4 ${theme === 'dark' ? 'text-gold-500' : ''}`}>
+                      <div className="flex items-center gap-4">
+                        <div className="w-16 h-16 bg-slate-900 rounded-2xl p-2 shadow-lg">
+                            <img
+                              src={boia.imagem}
+                              alt={boia.nome}
+                              className="w-full h-full object-contain"
+                            />
+                        </div>
 
                         <div>
-                          <strong className="text-base">{boia.nome}</strong>
+                          <p className="text-sm font-black uppercase tracking-tight">{boia.nome}</p>
 
                           <div
-                            className="mt-1 inline-block text-white text-xs px-2 py-1 rounded-full"
+                            className="mt-1 inline-block text-white dark:text-black text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full shadow-lg"
                             style={{ backgroundColor: corStatus }}
                           >
                             {getTextoStatus(boia.status)}
@@ -157,37 +159,34 @@ export function Mapa({ boias, data, setBoiaSelecionada, setPage }: Props) {
                         </div>
                       </div>
 
-                      <div className="text-sm space-y-1">
-                        <div>
-                          <strong>Última leitura:</strong>{" "}
-                          {ultima ? ultima.timestamp : "sem dados"}
+                      <div className="text-[11px] space-y-2 border-t border-slate-100 dark:border-gold-500/10 pt-4">
+                        <div className="flex justify-between">
+                          <span className="font-bold text-slate-400 dark:text-gold-500/40 uppercase">Última Telemetria</span>
+                          <span className="font-black">{ultima ? ultima.timestamp : "sem dados"}</span>
                         </div>
 
                         {ultima ? (
-                          <>
-                            <div>
-                              <strong>Temp. água:</strong>{" "}
-                              {ultima.tempAgua.toFixed(1)} °C
+                          <div className="grid grid-cols-2 gap-2 mt-2">
+                            <div className="bg-slate-50 dark:bg-gold-500/5 p-2 rounded-lg">
+                                <p className="text-[8px] font-black text-slate-400 dark:text-gold-500/40 uppercase">Água</p>
+                                <p className="text-xs font-black">{ultima.tempAgua.toFixed(1)} °C</p>
                             </div>
-
-                            <div>
-                              <strong>pH:</strong>{" "}
-                              {ultima.phAgua.toFixed(2)}
+                            <div className="bg-slate-50 dark:bg-gold-500/5 p-2 rounded-lg">
+                                <p className="text-[8px] font-black text-slate-400 dark:text-gold-500/40 uppercase">pH</p>
+                                <p className="text-xs font-black">{ultima.phAgua.toFixed(2)}</p>
                             </div>
-
-                            <div>
-                              <strong>Turbidez:</strong>{" "}
-                              {ultima.turbidez.toFixed(1)} NTU
+                            <div className="bg-slate-50 dark:bg-gold-500/5 p-2 rounded-lg">
+                                <p className="text-[8px] font-black text-slate-400 dark:text-gold-500/40 uppercase">Turbidez</p>
+                                <p className="text-xs font-black">{ultima.turbidez.toFixed(1)}</p>
                             </div>
-
-                            <div>
-                              <strong>Condutividade:</strong>{" "}
-                              {ultima.condutivEC.toFixed(0)} µS/cm
+                            <div className="bg-slate-50 dark:bg-gold-500/5 p-2 rounded-lg">
+                                <p className="text-[8px] font-black text-slate-400 dark:text-gold-500/40 uppercase">Condutiv.</p>
+                                <p className="text-xs font-black">{ultima.condutivEC.toFixed(0)}</p>
                             </div>
-                          </>
+                          </div>
                         ) : (
-                          <div className="text-gray-500">
-                            Nenhum dado enviado para esta boia.
+                          <div className="text-slate-400 italic">
+                            Aguardando stream de dados...
                           </div>
                         )}
                       </div>
@@ -197,9 +196,9 @@ export function Mapa({ boias, data, setBoiaSelecionada, setPage }: Props) {
                           setBoiaSelecionada(boia.id);
                           setPage("boiaDetalhe");
                         }}
-                        className="w-full bg-blue-700 text-white px-3 py-2 rounded-lg hover:bg-blue-800 transition"
+                        className="w-full bg-slate-900 dark:bg-gold-500 text-white dark:text-black py-3 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-800 dark:hover:bg-gold-400 transition-all"
                       >
-                        Ver detalhes
+                        Perfil da Estação
                       </button>
                     </div>
                   </Popup>

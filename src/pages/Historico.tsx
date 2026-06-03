@@ -20,6 +20,7 @@ import {
 interface Props {
   boias: BoiaConfig[];
   data: EnvironmentalData[];
+  theme?: "light" | "dark";
 }
 
 type Parametro = {
@@ -133,7 +134,7 @@ function baixarCSV(
   URL.revokeObjectURL(url);
 }
 
-export function Historico({ boias, data }: Props) {
+export function Historico({ boias, data, theme }: Props) {
   const boiasHabilitadas = boias.filter((boia) => boia.habilitada);
 
   const [boiaId, setBoiaId] = useState(boiasHabilitadas[0]?.id || "");
@@ -198,24 +199,24 @@ export function Historico({ boias, data }: Props) {
   );
 
   return (
-    <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Histórico</h1>
-        <p className="text-gray-500">
-          Filtre leituras por boia, período e sensores configurados.
+    <div className="p-8 lg:p-12 space-y-12 bg-slate-50 dark:bg-black min-h-screen transition-colors duration-500">
+      <div className="border-b border-slate-200 dark:border-gold-500/20 pb-8">
+        <h1 className="text-4xl font-black text-slate-900 dark:text-gold-500 tracking-tight uppercase">Histórico de Dados</h1>
+        <p className="text-slate-500 dark:text-gold-500/50 font-medium">
+          Análise retroativa e exportação de logs hidrológicos processados.
         </p>
       </div>
 
-      <div className="bg-white rounded-xl shadow-md p-6 space-y-4">
-        <h2 className="font-bold text-lg">Filtros</h2>
+      <div className="bg-white dark:bg-black rounded-[3rem] shadow-xl dark:shadow-gold-500/5 border border-slate-100 dark:border-gold-500/20 p-10 space-y-8">
+        <h2 className="font-black text-xl text-slate-900 dark:text-gold-500 uppercase tracking-tight">Filtros Avançados</h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">Boia</label>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+          <div className="space-y-1">
+            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-gold-500/50">Estação de Origem</label>
             <select
               value={boiaId}
               onChange={(e) => trocarBoia(e.target.value)}
-              className="w-full border rounded-lg px-3 py-2"
+              className="w-full bg-slate-50 dark:bg-black border border-slate-200 dark:border-gold-500/20 rounded-xl px-4 py-3 text-slate-700 dark:text-gold-500 focus:ring-2 focus:ring-blue-500 dark:focus:ring-gold-500 outline-none transition-all"
             >
               {boiasHabilitadas.map((boia) => (
                 <option key={boia.id} value={boia.id}>
@@ -225,27 +226,27 @@ export function Historico({ boias, data }: Props) {
             </select>
           </div>
 
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">
-              Data inicial
+          <div className="space-y-1">
+            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-gold-500/50">
+              Marco Inicial
             </label>
             <input
               type="date"
               value={dataInicial}
               onChange={(e) => setDataInicial(e.target.value)}
-              className="w-full border rounded-lg px-3 py-2"
+              className="w-full bg-slate-50 dark:bg-black border border-slate-200 dark:border-gold-500/20 rounded-xl px-4 py-3 text-slate-700 dark:text-gold-500 outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-gold-500"
             />
           </div>
 
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">
-              Data final
+          <div className="space-y-1">
+            <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-gold-500/50">
+              Marco Final
             </label>
             <input
               type="date"
               value={dataFinal}
               onChange={(e) => setDataFinal(e.target.value)}
-              className="w-full border rounded-lg px-3 py-2"
+              className="w-full bg-slate-50 dark:bg-black border border-slate-200 dark:border-gold-500/20 rounded-xl px-4 py-3 text-slate-700 dark:text-gold-500 outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-gold-500"
             />
           </div>
 
@@ -259,33 +260,34 @@ export function Historico({ boias, data }: Props) {
                 )
               }
               disabled={dadosFiltrados.length === 0}
-              className="w-full bg-blue-700 text-white py-2 rounded-lg hover:bg-blue-800 disabled:bg-gray-300"
+              className="w-full bg-slate-900 dark:bg-gold-500 text-white dark:text-black py-4 rounded-xl font-black uppercase text-[10px] tracking-widest hover:scale-[1.02] disabled:opacity-30 transition-all"
             >
-              Baixar CSV filtrado
+              Extrair Dataset (CSV)
             </button>
           </div>
         </div>
 
         <div>
-          <p className="text-sm text-gray-600 mb-2">
-            Sensores disponíveis nesta boia
+          <p className="text-[10px] font-black text-slate-400 dark:text-gold-500/50 uppercase tracking-widest mb-4">
+            Matriz de Sensores Disponíveis
           </p>
 
           {parametrosDisponiveis.length === 0 ? (
-            <p className="text-sm text-gray-500">
-              Nenhum sensor ativo configurado para esta boia.
+            <p className="text-sm text-slate-400 dark:text-gold-500/30">
+              A estação selecionada não possui sensores ativos configurados.
             </p>
           ) : (
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-4">
               {parametrosDisponiveis.map((parametro) => (
                 <label
                   key={parametro.key}
-                  className="flex items-center gap-2 bg-gray-100 px-3 py-2 rounded-lg text-sm cursor-pointer"
+                  className={`flex items-center gap-3 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest cursor-pointer transition-all border ${parametrosAtivos.includes(String(parametro.key)) ? 'bg-slate-900 text-white border-slate-900 dark:bg-gold-500 dark:text-black dark:border-gold-500' : 'bg-slate-50 text-slate-400 border-slate-200 dark:bg-black dark:text-gold-500/40 dark:border-gold-500/10 hover:border-slate-300 dark:hover:border-gold-500/30'}`}
                 >
                   <input
                     type="checkbox"
                     checked={parametrosAtivos.includes(String(parametro.key))}
                     onChange={() => toggleParametro(String(parametro.key))}
+                    className="hidden"
                   />
                   {parametro.label}
                 </label>
@@ -295,107 +297,106 @@ export function Historico({ boias, data }: Props) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl shadow p-5">
-          <p className="text-sm text-gray-500">Boia selecionada</p>
-          <p className="text-2xl font-bold">{boiaSelecionada?.nome || "-"}</p>
-        </div>
-
-        <div className="bg-white rounded-xl shadow p-5">
-          <p className="text-sm text-gray-500">Leituras filtradas</p>
-          <p className="text-2xl font-bold">{dadosFiltrados.length}</p>
-        </div>
-
-        <div className="bg-white rounded-xl shadow p-5">
-          <p className="text-sm text-gray-500">Sensores selecionados</p>
-          <p className="text-2xl font-bold">{parametrosAtivos.length}</p>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        {[
+          { l: "Estação Alvo", v: boiaSelecionada?.nome || "-", i: "Sensor Node" },
+          { l: "Amostras Sincronizadas", v: dadosFiltrados.length, i: "Time Series" },
+          { l: "Parâmetros Ativos", v: parametrosAtivos.length, i: "Data Streams" }
+        ].map((m, i) => (
+          <div key={i} className="bg-white dark:bg-black rounded-[2.5rem] shadow-lg border border-slate-100 dark:border-gold-500/20 p-8">
+            <p className="text-[10px] font-black text-slate-400 dark:text-gold-500/40 uppercase tracking-widest mb-2">{m.l}</p>
+            <p className="text-3xl font-black text-slate-900 dark:text-gold-500 tracking-tight truncate">{m.v}</p>
+            <p className="text-[9px] font-bold text-slate-300 dark:text-gold-500/20 uppercase tracking-widest mt-2">{m.i}</p>
+          </div>
+        ))}
       </div>
 
-      <div className="bg-white rounded-xl shadow-md p-6">
-        <h2 className="font-bold text-lg mb-4">Gráfico histórico</h2>
+      <div className="bg-white dark:bg-black rounded-[3rem] shadow-xl dark:shadow-gold-500/5 border border-slate-100 dark:border-gold-500/20 p-10 overflow-hidden">
+        <h2 className="font-black text-2xl text-slate-900 dark:text-gold-500 mb-10 uppercase tracking-tight">Visualização de Tendências</h2>
 
         {dadosFiltrados.length === 0 ? (
-          <div className="h-72 flex items-center justify-center text-gray-500">
-            Nenhuma leitura encontrada para os filtros selecionados.
-          </div>
-        ) : parametrosAtivos.length === 0 ? (
-          <div className="h-72 flex items-center justify-center text-gray-500">
-            Nenhum sensor selecionado para exibição.
+          <div className="h-96 flex items-center justify-center text-slate-400 dark:text-gold-500/30 font-black uppercase text-xs tracking-widest bg-slate-50 dark:bg-gold-500/5 rounded-[2rem] border border-dashed border-slate-200 dark:border-gold-500/10">
+            Nenhum dado encontrado para o período especificado.
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={400}>
-            <LineChart
-              data={chartData}
-              margin={{ top: 10, right: 30, left: 30, bottom: 45 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" />
+          <div className="h-[450px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart
+                data={chartData}
+                margin={{ top: 20, right: 40, left: 20, bottom: 60 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke={theme === "dark" ? "#d4af3720" : "#e2e8f0"} />
 
-              <XAxis
-                dataKey="name"
-                angle={-20}
-                textAnchor="end"
-                height={60}
-                interval="preserveStartEnd"
-                minTickGap={35}
-              />
+                <XAxis
+                  dataKey="name"
+                  angle={-30}
+                  textAnchor="end"
+                  height={80}
+                  stroke={theme === "dark" ? "#d4af3760" : "#64748b"}
+                  tick={{ fontSize: 10, fontWeight: 700 }}
+                />
 
-              <YAxis width={80} />
+                <YAxis width={80} stroke={theme === "dark" ? "#d4af3760" : "#64748b"} tick={{ fontSize: 10, fontWeight: 700 }} />
 
-              <Tooltip />
-              <Legend />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: theme === "dark" ? "#000" : "#fff", borderColor: theme === "dark" ? "#d4af3740" : "#e2e8f0", borderRadius: "1rem", color: theme === "dark" ? "#d4af37" : "#000" }} 
+                  itemStyle={{ fontSize: "12px", fontWeight: "bold" }}
+                />
+                <Legend wrapperStyle={{ paddingTop: "20px" }} />
 
-              {parametrosDisponiveis
-                .filter((parametro) =>
-                  parametrosAtivos.includes(String(parametro.key))
-                )
-                .map((parametro) => (
-                  <Line
-                    key={parametro.key}
-                    type="monotone"
-                    dataKey={parametro.key}
-                    name={`${parametro.label}${
-                      parametro.unidade ? ` (${parametro.unidade})` : ""
-                    }`}
-                    stroke={parametro.color}
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                ))}
-            </LineChart>
-          </ResponsiveContainer>
+                {parametrosDisponiveis
+                  .filter((parametro) =>
+                    parametrosAtivos.includes(String(parametro.key))
+                  )
+                  .map((parametro) => (
+                    <Line
+                      key={parametro.key}
+                      type="monotone"
+                      dataKey={parametro.key}
+                      name={`${parametro.label}${
+                        parametro.unidade ? ` (${parametro.unidade})` : ""
+                      }`}
+                      stroke={theme === "dark" ? "#d4af37" : parametro.color}
+                      strokeWidth={3}
+                      dot={false}
+                      activeDot={{ r: 6, stroke: "#000", strokeWidth: 2 }}
+                    />
+                  ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         )}
       </div>
 
-      <div className="bg-white rounded-xl shadow-md p-6">
-        <h2 className="font-bold text-lg mb-4">Tabela de leituras</h2>
+      <div className="bg-white dark:bg-black rounded-[3rem] shadow-xl dark:shadow-gold-500/5 border border-slate-100 dark:border-gold-500/20 p-10">
+        <h2 className="font-black text-2xl text-slate-900 dark:text-gold-500 mb-10 uppercase tracking-tight">Logs Brutos</h2>
 
         {parametrosDisponiveis.length === 0 ? (
-          <p className="text-gray-500">
-            Nenhum sensor ativo configurado para esta boia.
+          <p className="text-slate-400 dark:text-gold-500/30 text-center py-10">
+            Nenhum log operacional disponível para esta estação.
           </p>
         ) : (
-          <div className="overflow-auto">
-            <table className="w-full text-sm border-collapse">
+          <div className="overflow-x-auto rounded-2xl border border-slate-100 dark:border-gold-500/10">
+            <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b text-left">
-                  <th className="py-2 px-3">Timestamp</th>
+                <tr className="bg-slate-50 dark:bg-gold-500/10 text-slate-400 dark:text-gold-500 font-black uppercase text-[10px] tracking-widest border-b border-slate-200 dark:border-gold-500/20">
+                  <th className="py-5 px-6">Timestamp Operacional</th>
 
                   {parametrosDisponiveis.map((parametro) => (
-                    <th key={parametro.key} className="py-2 px-3">
+                    <th key={parametro.key} className="py-5 px-6">
                       {parametro.label}
                     </th>
                   ))}
                 </tr>
               </thead>
 
-              <tbody>
+              <tbody className="divide-y divide-slate-100 dark:divide-gold-500/10 text-slate-700 dark:text-gold-500/80">
                 {dadosFiltrados.slice(-50).map((leitura, index) => (
-                  <tr key={index} className="border-b">
-                    <td className="py-2 px-3">{leitura.timestamp}</td>
+                  <tr key={index} className="hover:bg-slate-50/50 dark:hover:bg-gold-500/5 transition-colors">
+                    <td className="py-4 px-6 font-bold text-xs">{leitura.timestamp}</td>
 
                     {parametrosDisponiveis.map((parametro) => (
-                      <td key={parametro.key} className="py-2 px-3">
+                      <td key={parametro.key} className="py-4 px-6 font-medium text-xs">
                         {formatarValor(
                           Number(leitura[parametro.key]),
                           parametro.unidade
@@ -410,8 +411,8 @@ export function Historico({ boias, data }: Props) {
         )}
 
         {dadosFiltrados.length > 50 && (
-          <p className="text-xs text-gray-500 mt-3">
-            Exibindo apenas as últimas 50 leituras filtradas.
+          <p className="text-[10px] font-black text-slate-400 dark:text-gold-500/30 mt-6 uppercase tracking-widest text-center">
+            Dataset truncado: exibindo as últimas 50 amostras do período.
           </p>
         )}
       </div>

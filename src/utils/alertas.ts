@@ -1,4 +1,4 @@
-import { BoiaConfig, EnvironmentalData } from "../types";
+import { BoiaConfig, EnvironmentalData, SensorConfig, SensoresBoia } from "../types";
 
 export type AlertaTipo = "critico" | "alerta" | "ok" | "info";
 
@@ -9,97 +9,113 @@ export interface Alerta {
   titulo: string;
   descricao: string;
   timestamp?: string;
+  sensor?: string;
+}
+
+function sensorAtivo(sensor?: SensorConfig) {
+  return sensor?.ativo === true;
+}
+
+function verificarLimites(
+  nomeBoia: string,
+  boiaId: string,
+  sensorKey: keyof SensoresBoia,
+  sensor: SensorConfig | undefined,
+  valor: number,
+  timestamp: string
+): Alerta[] {
+  if (!sensorAtivo(sensor) || valor == null) return [];
+
+  const alertas: Alerta[] = [];
+
+  // Checagem de níveis Críticos (Prioridade Máxima)
+  if (sensor?.minCritico !== undefined && valor < sensor.minCritico) {
+    alertas.push({
+      tipo: "critico",
+      boiaId,
+      boiaNome: nomeBoia,
+      titulo: `${sensor.nome} em nível crítico`,
+      descricao: `Valor abaixo do limite crítico (${valor.toFixed(2)} ${sensor.unidade})`,
+      timestamp,
+      sensor: String(sensorKey),
+    });
+  } else if (sensor?.maxCritico !== undefined && valor > sensor.maxCritico) {
+    alertas.push({
+      tipo: "critico",
+      boiaId,
+      boiaNome: nomeBoia,
+      titulo: `${sensor.nome} em nível crítico`,
+      descricao: `Valor acima do limite crítico (${valor.toFixed(2)} ${sensor.unidade})`,
+      timestamp,
+      sensor: String(sensorKey),
+    });
+  }
+  // Se já gerou crítico, não gera alerta de atenção para o mesmo sensor
+  else if (sensor?.minAlerta !== undefined && valor < sensor.minAlerta) {
+    alertas.push({
+      tipo: "alerta",
+      boiaId,
+      boiaNome: nomeBoia,
+      titulo: `${sensor.nome} em atenção`,
+      descricao: `Valor abaixo da faixa recomendada (${valor.toFixed(2)} ${sensor.unidade})`,
+      timestamp,
+      sensor: String(sensorKey),
+    });
+  } else if (sensor?.maxAlerta !== undefined && valor > sensor.maxAlerta) {
+    alertas.push({
+      tipo: "alerta",
+      boiaId,
+      boiaNome: nomeBoia,
+      titulo: `${sensor.nome} em atenção`,
+      descricao: `Valor acima da faixa recomendada (${valor.toFixed(2)} ${sensor.unidade})`,
+      timestamp,
+      sensor: String(sensorKey),
+    });
+  }
+
+  return alertas;
 }
 
 export function gerarAlertasBoia(
   boia: BoiaConfig,
   data: EnvironmentalData[]
 ): Alerta[] {
-  const dadosBoia = data.filter((leitura) => leitura.boiaId === boia.id);
-  const ultima = dadosBoia[dadosBoia.length - 1];
+  const dadosBoia = (data || []).filter((item) => item.boiaId === boia.id);
+  
+  if (!boia.habilitada) return [];
 
+  if (dadosBoia.length === 0) {
+    return [{
+      tipo: "info",
+      boiaId: boia.id,
+      boiaNome: boia.nome,
+      titulo: "Aguardando Dados",
+      descricao: "Nenhuma telemetria recebida até o momento.",
+    }];
+  }
+
+  const ultima = dadosBoia[dadosBoia.length - 1];
   const alertas: Alerta[] = [];
 
-  if (!boia.habilitada) {
-    alertas.push({
-      tipo: "info",
-      boiaId: boia.id,
-      boiaNome: boia.nome,
-      titulo: "Boia desabilitada",
-      descricao: "Esta boia está desabilitada no painel administrativo.",
-    });
+  // Mapeamento dinâmico de todos os sensores configurados
+  const keys = Object.keys(boia.sensores) as (keyof SensoresBoia)[];
+  
+  keys.forEach(key => {
+    const valor = ultima[key as keyof EnvironmentalData];
+    if (typeof valor === 'number') {
+      alertas.push(...verificarLimites(boia.nome, boia.id, key, boia.sensores[key], valor, ultima.timestamp));
+    }
+  });
 
-    return alertas;
-  }
-
-  if (!ultima) {
+  // Se houver um alerta manual travado (sticky), e a leitura atual for OK, 
+  // adicionamos uma nota de que há um alerta aguardando reconhecimento.
+  if (boia.alertaAtivo && boia.alertaTipo && !alertas.some(a => a.tipo === "critico" || a.tipo === "alerta")) {
     alertas.push({
-      tipo: "info",
+      tipo: boia.alertaTipo,
       boiaId: boia.id,
       boiaNome: boia.nome,
-      titulo: "Boia sem dados",
-      descricao: "Nenhum CSV foi enviado para esta boia.",
-    });
-
-    return alertas;
-  }
-
-  if (ultima.phAgua < 6 || ultima.phAgua > 9) {
-    alertas.push({
-      tipo: "critico",
-      boiaId: boia.id,
-      boiaNome: boia.nome,
-      titulo: "pH crítico",
-      descricao: `Última leitura: ${ultima.phAgua.toFixed(2)} pH.`,
-      timestamp: ultima.timestamp,
-    });
-  } else if (ultima.phAgua < 6.5 || ultima.phAgua > 8.5) {
-    alertas.push({
-      tipo: "alerta",
-      boiaId: boia.id,
-      boiaNome: boia.nome,
-      titulo: "pH fora da faixa recomendada",
-      descricao: `Última leitura: ${ultima.phAgua.toFixed(2)} pH.`,
-      timestamp: ultima.timestamp,
-    });
-  }
-
-  if (ultima.turbidez > 30) {
-    alertas.push({
-      tipo: "critico",
-      boiaId: boia.id,
-      boiaNome: boia.nome,
-      titulo: "Turbidez crítica",
-      descricao: `Última leitura: ${ultima.turbidez.toFixed(1)} NTU.`,
-      timestamp: ultima.timestamp,
-    });
-  } else if (ultima.turbidez > 15) {
-    alertas.push({
-      tipo: "alerta",
-      boiaId: boia.id,
-      boiaNome: boia.nome,
-      titulo: "Turbidez elevada",
-      descricao: `Última leitura: ${ultima.turbidez.toFixed(1)} NTU.`,
-      timestamp: ultima.timestamp,
-    });
-  }
-
-  if (ultima.tempAgua > 35) {
-    alertas.push({
-      tipo: "critico",
-      boiaId: boia.id,
-      boiaNome: boia.nome,
-      titulo: "Temperatura da água crítica",
-      descricao: `Última leitura: ${ultima.tempAgua.toFixed(1)} °C.`,
-      timestamp: ultima.timestamp,
-    });
-  } else if (ultima.tempAgua > 30) {
-    alertas.push({
-      tipo: "alerta",
-      boiaId: boia.id,
-      boiaNome: boia.nome,
-      titulo: "Temperatura da água elevada",
-      descricao: `Última leitura: ${ultima.tempAgua.toFixed(1)} °C.`,
+      titulo: `Alerta Persistente (${boia.alertaTipo})`,
+      descricao: "Esta estação detectou uma anomalia anteriormente e aguarda reconhecimento manual do administrador.",
       timestamp: ultima.timestamp,
     });
   }
@@ -109,8 +125,8 @@ export function gerarAlertasBoia(
       tipo: "ok",
       boiaId: boia.id,
       boiaNome: boia.nome,
-      titulo: "Sem alertas ativos",
-      descricao: "A última leitura está dentro dos limites configurados.",
+      titulo: "Operação Normal",
+      descricao: "Todos os parâmetros dentro da normalidade.",
       timestamp: ultima.timestamp,
     });
   }
@@ -118,9 +134,41 @@ export function gerarAlertasBoia(
   return alertas;
 }
 
+export function calcularStatusBoia(ultima: EnvironmentalData | undefined, boia: BoiaConfig): "ok" | "alerta" | "critico" | "offline" {
+  if (!boia.habilitada) return "offline";
+
+  // Se houver um alerta manual travado (sticky), ele ganha prioridade
+  if (boia.alertaAtivo && boia.alertaTipo) {
+    return boia.alertaTipo;
+  }
+
+  if (!ultima) return "offline";
+
+  // Verificação de timeout (15 min)
+  try {
+    const agora = new Date();
+    const ts = new Date(ultima.timestamp.includes('T') ? ultima.timestamp : ultima.timestamp.replace(" ", "T"));
+    if (isNaN(ts.getTime()) || (agora.getTime() - ts.getTime()) / 1000 / 60 > 15) return "offline";
+  } catch { return "offline"; }
+
+  const alertas = gerarAlertasBoia(boia, [ultima]);
+  
+  if (alertas.some(a => a.tipo === "critico")) return "critico";
+  if (alertas.some(a => a.tipo === "alerta")) return "alerta";
+  
+  return "ok";
+}
+
 export function gerarAlertasSistema(
   boias: BoiaConfig[],
   data: EnvironmentalData[]
 ): Alerta[] {
-  return boias.flatMap((boia) => gerarAlertasBoia(boia, data));
+  return (boias || [])
+    .filter(b => b.habilitada)
+    .flatMap((boia) => {
+       const alertas = gerarAlertasBoia(boia, data);
+       // Filtrar apenas alertas reais (não OK/Info) para a visão geral do sistema se desejado, 
+       // ou retornar tudo. Vamos retornar tudo e as páginas filtram.
+       return alertas;
+    });
 }
