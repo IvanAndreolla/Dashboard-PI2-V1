@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   Radio
 } from "lucide-react";
+import { useState, useEffect } from "react";
 import clsx from "clsx";
 
 import { BoiaConfig, EnvironmentalData } from "../types";
@@ -69,28 +70,6 @@ function calcularQualidadeGeral(boias: BoiaConfig[]) {
   };
 }
 
-function mediaTemperaturaAgua(boias: BoiaConfig[], data: EnvironmentalData[]) {
-  if (!boias || !data) return null;
-  const valores = boias
-    .map((boia) => getUltimaLeitura(data, boia.id))
-    .filter((d) => d != null && d.tempAgua != null)
-    .map((d) => d!.tempAgua);
-
-  if (valores.length === 0) return null;
-  return valores.reduce((acc, v) => acc + v, 0) / valores.length;
-}
-
-function mediaVento(boias: BoiaConfig[], data: EnvironmentalData[]) {
-  if (!boias || !data) return null;
-  const valores = boias
-    .map((boia) => getUltimaLeitura(data, boia.id))
-    .filter((d) => d != null && d.ventoVel != null)
-    .map((d) => d!.ventoVel);
-
-  if (valores.length === 0) return null;
-  return valores.reduce((acc, v) => acc + v, 0) / valores.length;
-}
-
 function getWindDirection(degree: number) {
   if (degree == null) return "--";
   const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
@@ -100,8 +79,36 @@ function getWindDirection(degree: number) {
 export function Publico({ boias, data, theme }: Props) {
   const boiasAtivas = (boias || []).filter((b) => b.habilitada);
   const qualidade = calcularQualidadeGeral(boiasAtivas);
-  const tempMedia = mediaTemperaturaAgua(boiasAtivas, data);
-  const ventoMedio = mediaVento(boiasAtivas, data);
+  
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(() => {
+    if (boiasAtivas.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % boiasAtivas.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [boiasAtivas.length]);
+
+  const safeIndex = currentIndex >= boiasAtivas.length ? 0 : currentIndex;
+  const currentBoia = boiasAtivas[safeIndex];
+  const ultimaGeral = currentBoia ? getUltimaLeitura(data, currentBoia.id) : null;
+  const ultimaBoiaNome = currentBoia ? currentBoia.nome : "";
+
+  let confiabilidade = 0;
+  if (currentBoia && ultimaGeral && currentBoia.status !== 'offline') {
+    const ts = new Date(ultimaGeral.timestamp.includes('T') ? ultimaGeral.timestamp : ultimaGeral.timestamp.replace(' ', 'T')).getTime();
+    const diffMinutos = Math.max(0, (Date.now() - ts) / 60000);
+    
+    if (diffMinutos <= 2) {
+      confiabilidade = 100;
+    } else if (diffMinutos >= 15) {
+      confiabilidade = 0;
+    } else {
+      // Degrada de 100% (2 min) a 10% (15 min)
+      confiabilidade = Math.max(10, Math.round(100 - ((diffMinutos - 2) / 13) * 90));
+    }
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-black p-6 lg:p-12 text-slate-900 dark:text-gold-500 selection:bg-sky-500 dark:selection:bg-gold-500 selection:text-white dark:selection:text-black transition-colors duration-500">
@@ -149,13 +156,13 @@ export function Publico({ boias, data, theme }: Props) {
                  <div>
                     <h3 className="text-slate-400 dark:text-gold-500/50 font-black uppercase text-[10px] tracking-[0.2em] mb-2">Temperatura Água</h3>
                     <p className="text-7xl font-black text-slate-900 dark:text-gold-500 tracking-tighter">
-                       {tempMedia != null ? tempMedia.toFixed(1) : "--"}
+                       {ultimaGeral && ultimaGeral.tempAgua != null ? ultimaGeral.tempAgua.toFixed(1) : "--"}
                        <span className="text-3xl text-sky-300 dark:text-gold-500/30 ml-2">°C</span>
                     </p>
                  </div>
               </div>
               <div className="mt-12 pt-8 border-t border-slate-100 dark:border-gold-500/10">
-                 <p className="text-[10px] text-slate-400 dark:text-gold-500/40 font-black uppercase tracking-widest">Média consolidada</p>
+                 <p className="text-[10px] text-slate-400 dark:text-gold-500/40 font-black uppercase tracking-widest">{ultimaBoiaNome ? `Última leitura: ${ultimaBoiaNome}` : 'Aguardando dados'}</p>
               </div>
            </div>
 
@@ -168,14 +175,19 @@ export function Publico({ boias, data, theme }: Props) {
                  <div>
                     <h3 className="text-slate-400 dark:text-gold-500/50 font-black uppercase text-[10px] tracking-[0.2em] mb-2">Velocidade Vento</h3>
                     <p className="text-7xl font-black text-slate-900 dark:text-gold-500 tracking-tighter">
-                       {ventoMedio != null ? ventoMedio.toFixed(1) : "--"}
+                       {ultimaGeral && ultimaGeral.ventoVel != null ? ultimaGeral.ventoVel.toFixed(1) : "--"}
                        <span className="text-3xl text-blue-200 dark:text-gold-500/30 ml-2">km/h</span>
                     </p>
                  </div>
               </div>
-              <div className="mt-12 pt-8 border-t border-slate-100 dark:border-gold-500/10 flex items-center gap-4">
-                 <div className="w-3 h-3 bg-sky-500 dark:bg-gold-500 rounded-full animate-ping shadow-[0_0_15px_rgba(14,165,233,0.8)]"></div>
-                 <p className="text-[10px] text-sky-500 dark:text-gold-400 font-black uppercase tracking-widest">Transmissão Ativa</p>
+              <div className="mt-12 pt-8 border-t border-slate-100 dark:border-gold-500/10 flex items-center justify-between">
+                 <div className="flex items-center gap-4">
+                   <div className={`w-3 h-3 rounded-full ${currentBoia && currentBoia.status !== 'offline' ? 'bg-sky-500 dark:bg-gold-500 animate-ping shadow-[0_0_15px_rgba(14,165,233,0.8)]' : 'bg-slate-300 dark:bg-slate-600'}`}></div>
+                   <p className={`text-[10px] font-black uppercase tracking-widest ${currentBoia && currentBoia.status !== 'offline' ? 'text-sky-500 dark:text-gold-400' : 'text-slate-400 dark:text-slate-500'}`}>
+                      {currentBoia && currentBoia.status !== 'offline' ? 'Transmissão Ativa' : 'Transmissão Inativa'}
+                   </p>
+                 </div>
+                 <p className="text-[10px] text-slate-400 dark:text-gold-500/40 font-black uppercase tracking-widest">{ultimaBoiaNome ? ultimaBoiaNome : ''}</p>
               </div>
            </div>
 
@@ -190,11 +202,14 @@ export function Publico({ boias, data, theme }: Props) {
                  <div>
                     <h3 className="text-blue-100 dark:text-gold-400 font-black uppercase text-[10px] tracking-[0.2em] mb-2 opacity-80">Confiabilidade</h3>
                     <p className="text-7xl font-black tracking-tighter">
-                       100<span className="text-3xl text-blue-300/50 dark:text-gold-500/30 ml-2">%</span>
+                       {confiabilidade}<span className="text-3xl text-blue-300/50 dark:text-gold-500/30 ml-2">%</span>
                     </p>
                  </div>
               </div>
-              <p className="text-xs text-blue-100/60 dark:text-gold-500/40 mt-12 font-bold uppercase tracking-[0.3em]">Sistemas Verificados</p>
+              <div className="mt-12 pt-8 border-t border-white/10 dark:border-gold-500/10 flex items-center justify-between">
+                 <p className="text-[10px] text-blue-100/60 dark:text-gold-500/40 font-black uppercase tracking-widest">Sinal da Estação</p>
+                 <p className="text-[10px] text-blue-100/80 dark:text-gold-500/60 font-black uppercase tracking-widest">{ultimaBoiaNome ? ultimaBoiaNome : ''}</p>
+              </div>
            </div>
         </div>
 
@@ -217,8 +232,8 @@ export function Publico({ boias, data, theme }: Props) {
                            <img src={boia.imagem} alt={boia.nome} className="w-full h-full object-contain" />
                         </div>
                         <div className="flex flex-col items-end">
-                           <span className={`px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-[0.2em] border shadow-lg ${leitura ? 'bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-gold-500/10 dark:text-gold-400 dark:border-gold-500/30' : 'bg-slate-50 text-slate-400 border-slate-100 dark:bg-black dark:text-gold-900 dark:border-gold-900/30'}`}>
-                              {leitura ? 'SISTEMA ONLINE' : 'SISTEMA OFFLINE'}
+                           <span className={`px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-[0.2em] border shadow-lg ${boia.status !== 'offline' ? 'bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-gold-500/10 dark:text-gold-400 dark:border-gold-500/30' : 'bg-slate-50 text-slate-400 border-slate-100 dark:bg-black dark:text-gold-900 dark:border-gold-900/30'}`}>
+                              {boia.status !== 'offline' ? 'SISTEMA ONLINE' : 'SISTEMA OFFLINE'}
                            </span>
                            <p className="text-[10px] text-slate-400 dark:text-gold-500/40 font-black mt-5 uppercase tracking-[0.2em]">{boia.local}</p>
                         </div>
