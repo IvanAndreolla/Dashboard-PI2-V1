@@ -12,7 +12,27 @@ import { userRoutes } from "./routes/users";
 
 const app = express();
 
-app.use(cors());
+// Configuração de CORS para o Deploy Híbrido (IFSC + Cloudflare)
+const allowedOrigins = [
+  "http://localhost:5173",       // Desenvolvimento Local
+  "http://localhost:3000",       // Preview Local
+  "https://aguasvivas.com.br",    // Domínio Produção (Cloudflare)
+  "https://www.aguasvivas.com.br" // Domínio Produção WWW
+];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Permite requisições sem origin (como mobile apps ou curl) ou que estejam na lista
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.log("Bloqueado pelo CORS:", origin);
+      callback(new Error("Não permitido pelo CORS"));
+    }
+  },
+  credentials: true
+}));
+
 app.use(express.json({ limit: "10mb" }));
 
 const server = http.createServer(app);

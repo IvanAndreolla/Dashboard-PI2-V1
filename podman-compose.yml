@@ -1,0 +1,53 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: hydra_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: hydra
+      POSTGRES_PASSWORD: hydra123
+      POSTGRES_DB: hydra_db
+    volumes:
+      - hydra_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hydra -d hydra_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Containerfile
+    container_name: hydra_backend
+    restart: always
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - DATABASE_URL=postgresql://hydra:hydra123@postgres:5432/hydra_db?schema=public
+      - JWT_SECRET=mudar_em_producao_ifsc
+      - MQTT_HOST=tcp://hydra.cloud.shiftr.io
+      - MQTT_PORT=1883
+      - MQTT_USERNAME=hydra
+      - MQTT_PASSWORD=jPNXy3hCee25J820
+      - MQTT_TOPIC=Hydra/#
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Containerfile.frontend
+      args:
+        - VITE_API_URL=https://api.aguasvivas.com.br
+    container_name: hydra_frontend
+    restart: always
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+
+volumes:
+  hydra_postgres_data:

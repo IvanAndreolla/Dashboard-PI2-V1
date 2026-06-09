@@ -1,0 +1,23 @@
+# Containerfile para o Backend - Dashboard Hydra
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copia arquivos de dependência
+COPY package*.json ./
+
+# Instala dependências
+RUN npm install
+
+# Copia o schema do Prisma e gera o client
+COPY prisma ./prisma
+RUN npx prisma generate
+
+# Copia o restante do código
+COPY . .
+
+# Expõe a porta do backend
+EXPOSE 3001
+
+# Comando para rodar migrações e iniciar
+CMD ["sh", "-c", "npx prisma migrate deploy && npm start"]

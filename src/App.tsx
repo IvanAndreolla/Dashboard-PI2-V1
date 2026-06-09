@@ -105,7 +105,8 @@ function App() {
   useEffect(() => {
     async function loadData() {
       try {
-        const res = await fetch("/api/leituras?limit=1000");
+        const apiUrl = import.meta.env.VITE_API_URL || "";
+        const res = await fetch(`${apiUrl}/api/leituras?limit=1000`);
         if (res.ok) {
           const leituras = await res.json();
           if (Array.isArray(leituras)) setData(leituras);
@@ -118,7 +119,8 @@ function App() {
   useEffect(() => {
     async function loadBoias() {
       try {
-        const res = await fetch("/api/boias");
+        const apiUrl = import.meta.env.VITE_API_URL || "";
+        const res = await fetch(`${apiUrl}/api/boias`);
         if (res.ok) {
           const bks = await res.json();
           if (Array.isArray(bks)) setBoias(bks.map(converterBoiaBackendParaFrontend));
@@ -134,7 +136,8 @@ function App() {
       setBoias(prev => {
         const exists = prev.some(b => b.id === novo.boiaId);
         if (!exists) {
-          fetch("/api/boias").then(r => r.json()).then(bks => {
+          const apiUrl = import.meta.env.VITE_API_URL || "";
+          fetch(`${apiUrl}/api/boias`).then(r => r.json()).then(bks => {
             if (Array.isArray(bks)) setBoias(bks.map(converterBoiaBackendParaFrontend));
           });
           return prev;
