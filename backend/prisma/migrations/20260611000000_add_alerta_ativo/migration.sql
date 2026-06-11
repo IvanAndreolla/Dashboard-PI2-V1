@@ -1,0 +1,2 @@
+ALTER TABLE "Boia" ADD COLUMN "alertaAtivo" BOOLEAN NOT NULL DEFAULT false; ALTER TABLE "Boia" ADD
+     COLUMN "alertaTipo" TEXT;
