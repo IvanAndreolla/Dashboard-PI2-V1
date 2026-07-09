@@ -61,14 +61,31 @@ Este projeto foi dockerizado para garantir que tudo instale automaticamente. Sig
    docker compose up -d --build
    ```
 
-### 🔑 Acesso Administrativo
-Após ligar o sistema pela primeira vez, acesse a área de administração abrindo o navegador no endereço:
+### 🔑 Acesso Administrativo e Criação do Primeiro Administrador
 
-*   **URL:** `http://localhost:3001`
-*   **Login Padrão:** `admin@hydra.local`
-*   **Senha Padrão:** `admin123`
+Como o banco de dados novo vem zerado por padrão (sem registros na tabela `Usuario`), é necessário cadastrar o primeiro administrador antes de fazer o login.
 
-*(Recomenda-se alterar a senha imediatamente após o primeiro login na aba "Gerenciar Usuários".)*
+O projeto possui um script dedicado para a criação do administrador padrão:
+*   **E-mail padrão:** `admin@hydra.local`
+*   **Senha padrão:** `admin123`
+
+#### Como rodar o script de criação do administrador:
+
+*   **No ambiente Docker (Produção/Stack local):**
+    Com a stack rodando, execute o comando a partir do terminal do hospedeiro:
+    ```bash
+    docker exec -it hydra_backend npx tsx src/createAdmin.ts
+    ```
+    *(Ou `docker compose exec backend npx tsx src/createAdmin.ts` a partir do diretório raiz).*
+
+*   **No ambiente de Desenvolvimento Local (fora de container):**
+    Com as dependências instaladas, vá até a pasta backend e execute:
+    ```bash
+    cd backend
+    npx tsx src/createAdmin.ts
+    ```
+
+Após executar o comando com sucesso, você poderá fazer o login utilizando as credenciais padrão em `http://localhost:3001` (ou na porta correspondente). Recomenda-se alterar a senha imediatamente na aba "Gerenciar Usuários".
 
 ---
 
@@ -96,5 +113,65 @@ Se você vai modificar o código no seu próprio computador, não precisa rodar 
 *   **Banco de Dados:** Mexeu na estrutura de dados (pasta `backend/prisma`)? Lembre-se de rodar `npx prisma db push` e reiniciar o backend.
 
 ---
+
+## 6. Estrutura e Ingestão de Dados (MQTT & CSV)
+
+O Dashboard Hydra aceita dados telemétricos via protocolo MQTT (em tempo real) ou via importação de arquivo CSV (em lote para histórico).
+
+### 📡 6.1. Payload MQTT (Tempo Real)
+
+A boia/hardware deve publicar mensagens em formato JSON no tópico `Hydra/<boia_id>` (onde `<boia_id>` é o identificador único da boia cadastrada, em letras minúsculas, ex: `boia_01`).
+
+**Estrutura do JSON do Payload:**
+```json
+{
+  "timestamp": "2026-06-02 16:25",
+  "lat": -27.593708,
+  "lon": -48.542835,
+  "alt": 16.6,
+  "tempAr": 25.3,
+  "umidAr": 70,
+  "pressao": 1012,
+  "indiceUV": 5,
+  "chuvaAcum": 0,
+  "ventoVel": 12,
+  "ventoDir": 180,
+  "tempAgua": 22.1,
+  "phAgua": 7.2,
+  "condutivEC": 980,
+  "turbidez": 12
+}
+```
+
+*   **Tópico:** `Hydra/<boia_id>`
+*   **Campos de geolocalização (`lat`, `lon`, `alt`):** Opcionais. Se enviados, a posição geográfica da boia será atualizada no mapa.
+*   **Campos de Sensores:** Todos os valores numéricos são opcionais no JSON do payload (mas devem ser declarados com o tipo correto). Valores ausentes ou nulos não sobrescreverão as leituras passadas, a menos que especificado.
+
+---
+
+### 📂 6.2. Estrutura de Importação CSV (Lote)
+
+Na área administrativa de cada boia, é possível fazer o upload de arquivos CSV contendo o histórico de leituras.
+
+*   **Separador:** Ponto e vírgula (`;`).
+*   **Codificação:** UTF-8.
+*   **Cabeçalho obrigatório (Primeira Linha):**
+    ```csv
+    timestamp;tempAr;umidAr;pressao;indiceUV;chuvaAcum;ventoVel;ventoDir;tempAgua;phAgua;condutivEC;turbidez
+    ```
+
+**Exemplo de conteúdo de arquivo CSV (`dados.csv`):**
+```csv
+timestamp;tempAr;umidAr;pressao;indiceUV;chuvaAcum;ventoVel;ventoDir;tempAgua;phAgua;condutivEC;turbidez
+2026-05-01 10:00;25.3;70;1012;5;0;12;180;22.1;7.2;980;12
+2026-05-01 10:15;25.1;72;1011.8;4;0;11;175;22.0;7.1;978;13
+2026-05-01 10:30;24.9;75;1011.5;4;0.2;14;190;21.9;7.2;982;12
+```
+
+> [!IMPORTANT]
+> O formato da data e hora (`timestamp`) deve seguir o padrão `YYYY-MM-DD HH:MM` (ex: `2026-05-01 10:00`) ou padrão ISO 8601 correspondente. Valores decimais nos sensores devem utilizar o caractere de ponto (`.`) como separador decimal.
+
+---
+
 **Instituto Federal de Santa Catarina — Campus Florianópolis**
 Curso de Engenharia Eletrônica — Projeto Integrador 2
